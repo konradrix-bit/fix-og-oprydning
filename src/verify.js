@@ -8,9 +8,9 @@ const {
   MessageFlags,
   PermissionFlagsBits,
 } = require('discord.js');
-const { isManager } = require('./access');
+const { humanError, isManager, memberHasRole } = require('./access');
 const { GREEN } = require('./logic');
-const { eligibleIds, oauthUrl, parseDpull, pullMembers } = require('./pull');
+const { eligibleIds, parseDpull, pullMembers } = require('./pull');
 const { openSeal, seal } = require('./seal');
 const { getGuild, save } = require('./store');
 const { record } = require('./logger');
@@ -106,17 +106,13 @@ function saveGrant(guildId, userId, grant, botToken) {
   save();
 }
 
-function verifyEmbed(guild, roleId) {
+function verifyEmbed(roleId) {
   const role = roleId ? `<@&${roleId}>` : 'ikke valgt';
   return new EmbedBuilder()
     .setColor(GREEN)
     .setTitle('Verificer')
-    .setDescription([
-      'Tryk på knappen og godkend botten.',
-      `Derefter får du rollen ${role}.`,
-      'Når du har rollen, kan en manager flytte dig med til en anden server, botten er på, med !dpull.',
-    ].join('\n\n'))
-    .setFooter({ text: 'Du kan kun flyttes, hvis du selv har godkendt det.' });
+    .setDescription(`Tryk på knappen, så får du rollen ${role}.`)
+    .setFooter({ text: 'Et tryk er nok.' });
 }
 
 function verifyRow() {
@@ -175,7 +171,7 @@ async function handleVerify(interaction) {
     return;
   }
   await channel.send({
-    embeds: [verifyEmbed(interaction.guild, settings.verify.roleId)],
+    embeds: [verifyEmbed(settings.verify.roleId)],
     components: [verifyRow()],
   });
   await interaction.reply({ content: `Verify-panelet er sendt i ${channel}.`, flags: MessageFlags.Ephemeral });
@@ -183,31 +179,37 @@ async function handleVerify(interaction) {
 
 async function handleVerifyButton(interaction) {
   const settings = getGuild(interaction.guildId);
-  if (!settings.verify.roleId) {
+  const roleId = settings.verify.roleId;
+  if (!roleId) {
     await interaction.reply({ content: 'Verify-rollen er ikke valgt endnu.', flags: MessageFlags.Ephemeral });
     return;
   }
-  const config = oauthSettings();
-  if (!config.ready) {
-    const content = isManager(interaction)
-      ? 'Sæt DISCORD_CLIENT_SECRET og REDIRECT_URI på hosten. Redirect-adressen skal slutte på /callback og være tilføjet under OAuth2 i Developer Portal.'
-      : 'Verificering er ikke klar endnu. Sig det til en admin.';
-    await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  const role = interaction.guild.roles.cache.get(roleId);
+  if (!role || !canAssign(interaction.guild, role)) {
+    await interaction.reply({
+      content: 'Jeg kan ikke give rollen. Læg bot-rollen over verify-rollen, og vælg den igen med /verify rolle.',
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
-  const state = createState(interaction.guildId, interaction.user.id);
-  const url = oauthUrl({
-    clientId: interaction.client.user.id,
-    redirectUri: config.redirectUri,
-    state,
-  });
-  await interaction.reply({
-    content: 'Godkend botten. Bagefter får du verify-rollen, og en manager kan flytte dig med `!dpull`.',
-    components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Godkend').setURL(url),
-    )],
-    flags: MessageFlags.Ephemeral,
-  });
+  if (memberHasRole(interaction.member, roleId)) {
+    await interaction.reply({ content: 'Du er allerede verificeret.', flags: MessageFlags.Ephemeral });
+    return;
+  }
+  try {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    await member.roles.add(roleId, 'Verificeret');
+  } catch (err) {
+    await interaction.reply({ content: humanError(err), flags: MessageFlags.Ephemeral });
+    return;
+  }
+  await interaction.reply({ content: `Du er verificeret og har fået ${role}.`, flags: MessageFlags.Ephemeral });
+  await record(interaction.guild, {
+    type: 'protect',
+    userId: interaction.user.id,
+    channelId: interaction.channelId,
+    summary: `${interaction.user.tag} verificerede og fik rollen ${role.name}.`,
+  }).catch(() => {});
 }
 
 async function completeVerify(client, code, state) {

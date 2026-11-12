@@ -66,7 +66,7 @@ Botten skal have View Audit Log, Manage Channels, Manage Roles, Create Invite, M
 
 ## Verificering og !dpull
 
-`/verify rolle` vælger rollen, folk får. `/verify panel` sender det grønne panel. Knappen åbner Discords godkendelse, og bagefter får de rollen.
+`/verify rolle` vælger rollen, folk får. `/verify panel` sender det grønne panel. Et tryk på **Verificer** giver rollen med det samme.
 
 `!dpull 123456789012345678` flytter de medlemmer, der både har rollen og selv har godkendt, over på den server. Botten skal også være på den server. Folk uden godkendelse bliver ikke flyttet. Discord tillader ikke at hente andre serveres medlemmer ind uden deres egen godkendelse.
 
