@@ -233,7 +233,7 @@ test('verify-linket beder om guilds.join og godkendelsen kan pakkes ind', () => 
 
 test('en .env fil udfylder kun variabler der mangler', () => {
   const file = path.join(os.tmpdir(), `fix-env-${process.pid}.env`);
-  fs.writeFileSync(file, '# kommentar\nDEMO_TOKEN=abc\nDEMO_PORT=3000\n');
+  fs.writeFileSync(file, '# kommentar\nexport DEMO_TOKEN=abc\nDEMO_PORT=3000\n');
   delete process.env.DEMO_TOKEN;
   process.env.DEMO_PORT = '9';
   loadEnv(file);

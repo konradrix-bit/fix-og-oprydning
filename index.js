@@ -15,7 +15,7 @@ const { handleDpull, startVerifyServer } = require('./src/verify');
 const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || process.env.BOT_TOKEN || '').trim();
 
 if (!token) {
-  console.error('Mangler DISCORD_TOKEN. Læg den i .env ved siden af index.js, eller under Startup → Environment Variables på Wispbyte.');
+  console.error('Mangler DISCORD_TOKEN. Gem tokenet i Wispbytes Environment file under navnet DISCORD_TOKEN, og upload den nye index.js.');
   process.exit(1);
 }
 
