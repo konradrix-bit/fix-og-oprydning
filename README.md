@@ -2,7 +2,11 @@
 
 Grøn Discord-bot med ticket-builder, beskyttelse og logs. Den er lavet til at køre på [Wispbytes gratis Discord-hosting](https://wispbyte.com/free-discord-bot-hosting).
 
-`index.js` ligger i roden. Startup-kommandoen er `node index.js`. Tokenet læses fra miljøvariablen `DISCORD_TOKEN`.
+`index.js` ligger i roden. Startup-kommandoen er `node index.js`. Tokenet læses fra `.env` eller fra miljøvariablen `DISCORD_TOKEN`.
+
+Invite-link til den her bot:
+
+https://discord.com/api/oauth2/authorize?client_id=1570468958874894376&permissions=1099780189331&scope=bot%20applications.commands
 
 ## Download og host
 
@@ -13,6 +17,7 @@ Grøn Discord-bot med ticket-builder, beskyttelse og logs. Den er lavet til at k
    - Startup command: `node index.js`
    - Additional Node Packages: `discord.js`
    - Environment variable: `DISCORD_TOKEN` = tokenet fra [Discord Developer Portal](https://discord.com/developers/applications)
+   - Eller kopiér `.env.example` til `.env` i Files og skriv tokenet der. Zip-filen på GitHub indeholder ikke et udfyldt `.env`.
 5. Tryk **Start**. Konsollen printer et invite-link, når botten er online.
 
 Slå **Message Content Intent** og **Server Members Intent** til under Bot i Developer Portal, før du starter. Uden dem kan login fejle, og link-filter plus join-logs virker ikke.

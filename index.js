@@ -1,3 +1,7 @@
+const { loadEnv } = require('./src/env');
+
+loadEnv();
+
 const { Client, GatewayIntentBits, MessageFlags, Options, Partials } = require('discord.js');
 const { logErr } = require('./src/access');
 const { inviteUrl, registerCommands } = require('./src/deploy');
@@ -11,7 +15,7 @@ const { handleDpull, startVerifyServer } = require('./src/verify');
 const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || process.env.BOT_TOKEN || '').trim();
 
 if (!token) {
-  console.error('Mangler DISCORD_TOKEN. Sæt den under Startup → Environment Variables på Wispbyte.');
+  console.error('Mangler DISCORD_TOKEN. Læg den i .env ved siden af index.js, eller under Startup → Environment Variables på Wispbyte.');
   process.exit(1);
 }
 

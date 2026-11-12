@@ -11,6 +11,7 @@ INCLUDE = [
     "package.json",
     "package-lock.json",
     "README.md",
+    ".env.example",
     ".gitignore",
     "data/.gitkeep",
 ]

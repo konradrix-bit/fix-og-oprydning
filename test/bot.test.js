@@ -28,6 +28,7 @@ const { applyAddModal, applyTextModal, createState, forget, panelSelect, render 
 const { panelEmbed, ticketEmbed } = require('../src/theme');
 const { eligibleIds, oauthUrl, parseDpull, pullMembers } = require('../src/pull');
 const { openSeal, seal } = require('../src/seal');
+const { loadEnv } = require('../src/env');
 
 function fields(map) {
   return { getTextInputValue: (id) => map[id] ?? '' };
@@ -228,4 +229,17 @@ test('verify-linket beder om guilds.join og godkendelsen kan pakkes ind', () => 
   assert.equal(packed.includes('hemmelig'), false);
   assert.deepEqual(openSeal(packed, 'noegle'), { accessToken: 'hemmelig', refreshToken: 'ogsaa' });
   assert.throws(() => openSeal(packed, 'forkert'));
+});
+
+test('en .env fil udfylder kun variabler der mangler', () => {
+  const file = path.join(os.tmpdir(), `fix-env-${process.pid}.env`);
+  fs.writeFileSync(file, '# kommentar\nDEMO_TOKEN=abc\nDEMO_PORT=3000\n');
+  delete process.env.DEMO_TOKEN;
+  process.env.DEMO_PORT = '9';
+  loadEnv(file);
+  assert.equal(process.env.DEMO_TOKEN, 'abc');
+  assert.equal(process.env.DEMO_PORT, '9');
+  delete process.env.DEMO_TOKEN;
+  delete process.env.DEMO_PORT;
+  fs.rmSync(file, { force: true });
 });
