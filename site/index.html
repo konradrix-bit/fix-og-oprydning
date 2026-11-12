@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fix og oprydning</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --green: #22c55e;
+      --green-deep: #15803d;
+      --ink: #e7f6ec;
+      --muted: #b7d0c0;
+      --bg: #07140e;
+      --card: #10281c;
+      --line: #1f4d32;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(900px 420px at 10% -10%, rgba(34, 197, 94, 0.18), transparent 60%),
+        var(--bg);
+      color: var(--ink);
+    }
+    main { max-width: 920px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1 { font-size: 2.4rem; line-height: 1.1; margin: 0 0 12px; }
+    h2 { margin: 36px 0 12px; font-size: 1.35rem; }
+    p, li { color: var(--muted); line-height: 1.55; }
+    a { color: var(--green); }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      background: var(--green);
+      color: #05210f;
+      font-weight: 700;
+      padding: 14px 18px;
+      border-radius: 10px;
+    }
+    .btn.ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--green);
+    }
+    .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 18px; }
+    .card, .embed {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    ol { margin: 0; padding-left: 18px; }
+    .embed { border-left: 4px solid var(--green); }
+    .embed h3 { margin: 0 0 8px; }
+    .banner {
+      margin-top: 14px;
+      height: 92px;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #14532d, #22c55e);
+      display: grid;
+      place-items: center;
+      color: #05210f;
+      font-weight: 700;
+    }
+    code { color: var(--green); }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p>Discord-bot · grøn UI</p>
+    <h1>Fix og oprydning</h1>
+    <p>Ticket-panel med op til 10 valg, egen tekst og et banner nederst. Plus beskyttelse og logs, klar til Wispbyte.</p>
+    <div class="actions">
+      <a class="btn" href="bot.zip" download>Download bot.zip</a>
+      <a class="btn ghost" href="https://wispbyte.com/free-discord-bot-hosting" target="_blank" rel="noopener noreferrer">Host på Wispbyte</a>
+    </div>
+    <div class="grid">
+      <div class="embed">
+        <h3>Tickets</h3>
+        <p>Vælg en kategori nedenfor. Billedlinket sættes nederst som banner.</p>
+        <p>🎫 <strong>Support</strong> — Hjælp til serveren</p>
+        <div class="banner">Banner fra dit link</div>
+      </div>
+      <div class="card">
+        <h2 style="margin-top:0">Sådan hoster du den</h2>
+        <ol>
+          <li>Download zip-filen.</li>
+          <li>Åbn Wispbyte og opret en Node.js-server.</li>
+          <li>Upload zip-filen under Files og pak den ud i roden.</li>
+          <li>Startup: <code>node index.js</code></li>
+          <li>Pakke: <code>discord.js</code></li>
+          <li>Miljøvariabel: <code>DISCORD_TOKEN</code></li>
+          <li>Slå Message Content og Server Members til i Developer Portal.</li>
+          <li>Start, og brug invite-linket fra konsollen.</li>
+        </ol>
+      </div>
+    </div>
+    <h2>Kommandoer</h2>
+    <div class="card">
+      <p><code>/ticketmake</code> bygger panelet. <code>/verify</code> vælger rollen, folk får. <code>!dpull server-id</code> flytter dem, der har godkendt, over på den server. <code>/protect</code> slår anti-spam, anti-raid, links, invites, mentions og lockdown til. <code>/logs</code> slår slettede beskeder, joins, audit log og tickets op. <code>/info</code> viser bruger eller server.</p>
+      <p>Alt beskyttelse er slået fra, indtil du tænder det. Slet ikke <code>data/store.json</code> på serveren, hvis panelerne skal blive.</p>
+    </div>
+  </main>
+</body>
+</html>
