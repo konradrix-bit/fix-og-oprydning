@@ -13,6 +13,8 @@ function inviteUrl(clientId) {
     'ModerateMembers',
     'KickMembers',
     'ViewAuditLog',
+    'ManageRoles',
+    'CreateInstantInvite',
   ];
   const permissions = names.reduce((sum, name) => sum | PermissionFlagsBits[name], 0n);
   return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=${permissions}&scope=bot%20applications.commands`;

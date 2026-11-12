@@ -176,6 +176,23 @@ const commands = [
       .setDescription('Vis konto, roller og banner')
       .addUserOption((option) => option.setName('bruger').setDescription('Hvem der slås op')))
     .addSubcommand((sub) => sub.setName('server').setDescription('Vis serverens tal')),
+  new SlashCommandBuilder()
+    .setName('verify')
+    .setDescription('Vælg rollen folk får, når de verificerer')
+    .setDMPermission(false)
+    .setDefaultMemberPermissions(manage)
+    .addSubcommand((sub) => sub
+      .setName('rolle')
+      .setDescription('Rollen der gives efter verificering')
+      .addRoleOption((option) => option.setName('rolle').setDescription('Verify-rolle').setRequired(true)))
+    .addSubcommand((sub) => sub
+      .setName('panel')
+      .setDescription('Send det grønne verify-panel')
+      .addChannelOption((option) => option
+        .setName('kanal')
+        .setDescription('Kanalen panelet skal stå i')
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
+    .addSubcommand((sub) => sub.setName('status').setDescription('Vis rollen og hvor mange der kan flyttes')),
 ];
 
 module.exports = { commands, LOG_TYPES, AUDIT_TYPES };

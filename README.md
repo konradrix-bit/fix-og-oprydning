@@ -62,4 +62,18 @@ Alt er slået fra, indtil du tænder det med `/protect`. Staff-rollen og folk me
 | `/info bruger` | Konto, roller og banner |
 | `/info server` | Servertallene |
 
-Botten skal have View Audit Log, Manage Channels, Manage Messages, Moderate Members og Kick Members. Invite-linket i konsollen har de rettigheder med.
+Botten skal have View Audit Log, Manage Channels, Manage Roles, Create Invite, Manage Messages, Moderate Members og Kick Members. Invite-linket i konsollen har de rettigheder med.
+
+## Verificering og !dpull
+
+`/verify rolle` vælger rollen, folk får. `/verify panel` sender det grønne panel. Knappen åbner Discords godkendelse, og bagefter får de rollen.
+
+`!dpull 123456789012345678` flytter de medlemmer, der både har rollen og selv har godkendt, over på den server. Botten skal også være på den server. Folk uden godkendelse bliver ikke flyttet. Discord tillader ikke at hente andre serveres medlemmer ind uden deres egen godkendelse.
+
+På Wispbyte skal du også sætte:
+
+- `DISCORD_CLIENT_SECRET` = client secret fra Developer Portal, OAuth2
+- `REDIRECT_URI` = en offentlig adresse der ender på `/callback`, og den samme adresse tilføjet under OAuth2 → Redirects
+- `PORT` = porten hosten giver, hvis den ikke er 3000
+
+Uden de to værdier virker rolle-panelet, men `!dpull` kan ikke flytte nogen. Skifter du bot-token, skal folk verificere igen.

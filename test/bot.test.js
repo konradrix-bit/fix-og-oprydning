@@ -26,6 +26,8 @@ const { commands } = require('../src/commands');
 const { inviteUrl } = require('../src/deploy');
 const { applyAddModal, applyTextModal, createState, forget, panelSelect, render } = require('../src/builder');
 const { panelEmbed, ticketEmbed } = require('../src/theme');
+const { eligibleIds, oauthUrl, parseDpull, pullMembers } = require('../src/pull');
+const { openSeal, seal } = require('../src/seal');
 
 function fields(map) {
   return { getTextInputValue: (id) => map[id] ?? '' };
@@ -120,7 +122,7 @@ test('store gemmer logs og paneler på disken', () => {
 
 test('kommandoerne har ticketmake, protect og logs med gyldige navne', () => {
   const names = commands.map((command) => command.name);
-  assert.deepEqual(names, ['ticketmake', 'ticket', 'protect', 'logs', 'info']);
+  assert.deepEqual(names, ['ticketmake', 'ticket', 'protect', 'logs', 'info', 'verify']);
   const walk = (option, trail) => {
     assert.match(option.name, /^[a-z0-9-]{1,32}$/, trail);
     assert.ok(option.description.length > 0 && option.description.length <= 100, trail);
@@ -193,4 +195,37 @@ test('builderen er grøn, har banner nederst og stopper ved 10 valg', () => {
   assert.equal(posted.image.url, 'https://cdn.example/bund.png');
   forget(state);
   forget(empty);
+});
+
+test('!dpull læser server-id og flytter kun folk med rollen', async () => {
+  assert.equal(parseDpull('hej'), null);
+  assert.deepEqual(parseDpull('!dpull'), { guildId: null });
+  assert.deepEqual(parseDpull('!Dpull 123456789012345678'), { guildId: '123456789012345678' });
+  assert.equal(parseDpull('!dpull 123'), null);
+  const ids = eligibleIds(
+    { a: { sealed: 'x' }, b: { sealed: 'y' }, c: { sealed: 'z' } },
+    ['b', 'c', 'mangler'],
+  );
+  assert.deepEqual(ids, ['b', 'c']);
+  const result = await pullMembers(['a', 'b', 'c'], async (id) => {
+    if (id === 'a') return 201;
+    if (id === 'b') return 204;
+    throw new Error('nej');
+  });
+  assert.deepEqual(result, { added: 1, already: 1, failed: 1 });
+});
+
+test('verify-linket beder om guilds.join og godkendelsen kan pakkes ind', () => {
+  const url = new URL(oauthUrl({
+    clientId: '99',
+    redirectUri: 'https://bot.example/callback',
+    state: 'abc',
+  }));
+  assert.equal(url.searchParams.get('scope'), 'identify guilds.join');
+  assert.equal(url.searchParams.get('state'), 'abc');
+  assert.equal(url.searchParams.get('redirect_uri'), 'https://bot.example/callback');
+  const packed = seal({ accessToken: 'hemmelig', refreshToken: 'ogsaa' }, 'noegle');
+  assert.equal(packed.includes('hemmelig'), false);
+  assert.deepEqual(openSeal(packed, 'noegle'), { accessToken: 'hemmelig', refreshToken: 'ogsaa' });
+  assert.throws(() => openSeal(packed, 'forkert'));
 });

@@ -24,6 +24,7 @@ function defaultGuild() {
     logs: { channelId: null, entries: [] },
     panels: {},
     tickets: {},
+    verify: { roleId: null, members: {} },
   };
 }
 
@@ -55,7 +56,10 @@ function getGuild(guildId) {
     data.guilds[guildId] = defaultGuild();
     save();
   }
-  return data.guilds[guildId];
+  const guild = data.guilds[guildId];
+  if (!guild.verify) guild.verify = { roleId: null, members: {} };
+  if (!guild.verify.members) guild.verify.members = {};
+  return guild;
 }
 
 function pushLog(guildId, entry) {

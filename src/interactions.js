@@ -2,6 +2,7 @@ const { MessageFlags } = require('discord.js');
 const { handleLogs, handleInfo } = require('./logger');
 const { handleProtect } = require('./protect');
 const { handleTicketCommand, handleTicketComponent, handleTicketMake } = require('./tickets');
+const { handleVerify, handleVerifyButton } = require('./verify');
 
 function isSelect(interaction) {
   if (typeof interaction.isAnySelectMenu === 'function') return interaction.isAnySelectMenu();
@@ -31,6 +32,11 @@ async function onInteraction(interaction) {
     if (interaction.commandName === 'protect') return handleProtect(interaction);
     if (interaction.commandName === 'logs') return handleLogs(interaction);
     if (interaction.commandName === 'info') return handleInfo(interaction);
+    if (interaction.commandName === 'verify') return handleVerify(interaction);
+    return;
+  }
+  if (interaction.isButton() && interaction.customId === 'verify:go') {
+    await handleVerifyButton(interaction);
     return;
   }
   if ((interaction.isModalSubmit() || interaction.isButton() || isSelect(interaction)) && isTicketUi(interaction.customId)) {

@@ -4,6 +4,7 @@ const { inviteUrl, registerCommands } = require('./src/deploy');
 const { onInteraction } = require('./src/interactions');
 const { attachLogger } = require('./src/logger');
 const { onMemberAdd, onMessage } = require('./src/protect');
+const { handleDpull, startVerifyServer } = require('./src/verify');
 
 // Wispbyte: startup-kommando `node index.js`
 // Miljøvariabel: DISCORD_TOKEN
@@ -36,6 +37,7 @@ const client = new Client({
 client.once('clientReady', async () => {
   console.log(`Logget ind som ${client.user.tag}`);
   console.log(`Invite: ${inviteUrl(client.user.id)}`);
+  startVerifyServer(client);
   for (const guild of client.guilds.cache.values()) {
     try {
       await registerCommands(token, client.user.id, guild.id);
@@ -69,6 +71,7 @@ client.on('interactionCreate', (interaction) => {
 });
 
 client.on('messageCreate', (message) => {
+  handleDpull(message).catch(logErr);
   onMessage(message).catch(logErr);
 });
 
