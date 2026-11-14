@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en" data-menu="open" data-esp="on">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phantom Range</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 28 9v14L16 30 4 23V9Z' fill='none' stroke='%238d6bff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%233ec5ff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <canvas id="overlay"></canvas>
+
+  <div class="hud">
+    <section class="perf" id="perf" aria-label="Performance">
+      <div class="perf-top">
+        <span class="chip" id="esp-chip">ESP ON</span>
+        <span id="fps-wrap"><strong id="fps">60</strong><small>FPS</small></span>
+      </div>
+      <div class="perf-grid" id="perf-detail">
+        <span id="frame-ms">0.0 ms</span>
+        <span id="entity-count">10 players</span>
+        <span id="visible-count">0 in sight</span>
+      </div>
+    </section>
+
+    <section class="pcard" id="player-card" aria-label="Player information">
+      <div class="pcard-kicker">Player</div>
+      <div class="pcard-name" id="pcard-name">—</div>
+      <dl class="pcard-stats">
+        <div><dt>Health</dt><dd id="pcard-hp">—</dd></div>
+        <div><dt>Distance</dt><dd id="pcard-dist">—</dd></div>
+        <div><dt>Sight</dt><dd id="pcard-vis">—</dd></div>
+        <div><dt>Team</dt><dd id="pcard-team">—</dd></div>
+        <div><dt>Bone</dt><dd id="pcard-bone">—</dd></div>
+      </dl>
+    </section>
+
+    <button type="button" class="hint" id="menu-toggle" aria-keyshortcuts="Insert">Insert · Menu</button>
+  </div>
+
+  <aside class="menu" id="menu" aria-label="Simulator menu">
+    <header class="menu-head">
+      <div class="brand">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 3 27 9.2v13.6L16 29 5 22.8V9.2Z" fill="none" stroke="url(#logo)" stroke-width="1.6"/>
+          <circle cx="16" cy="16" r="2.4" fill="url(#logo)"/>
+          <defs>
+            <linearGradient id="logo" x1="4" y1="3" x2="28" y2="29">
+              <stop stop-color="#3ec5ff"/>
+              <stop offset="1" stop-color="#b07cff"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div>
+          <strong>Phantom</strong>
+          <span>Offline combat visualizer</span>
+        </div>
+      </div>
+      <button type="button" id="menu-close" aria-label="Close menu">
+        <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+
+    <div class="menu-body">
+      <nav class="nav" aria-label="Modules">
+        <button type="button" data-tab="esp" class="is-active" aria-selected="true">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          ESP
+        </button>
+        <button type="button" data-tab="assist" aria-selected="false">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          Aim Assist
+        </button>
+        <button type="button" data-tab="aimbot" aria-selected="false">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3"/></svg>
+          Aimbot
+        </button>
+        <button type="button" data-tab="trigger" aria-selected="false">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>
+          Triggerbot
+        </button>
+        <button type="button" data-tab="visuals" aria-selected="false">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.8 4.8l1.8 1.8M17.4 17.4l1.8 1.8M19.2 4.8l-1.8 1.8M6.6 17.4l-1.8 1.8"/></svg>
+          Visuals
+        </button>
+        <button type="button" data-tab="system" aria-selected="false">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="10" cy="17" r="2.1"/></svg>
+          Settings
+        </button>
+      </nav>
+
+      <div class="content">
+        <section class="panel is-on" data-panel="esp">
+          <h2>ESP</h2>
+          <p class="lede">Boxes, skeleton, and player data drawn on dummy targets. This overlay stays up when the menu closes.</p>
+          <div class="row">
+            <div><div class="row-title">Player ESP</div><div class="row-help">Master switch for the overlay.</div></div>
+            <label class="switch"><input type="checkbox" data-path="esp.enabled" checked><i></i></label>
+          </div>
+          <h3>Markers</h3>
+          <div class="row"><div><div class="row-title">2D box</div></div><label class="switch"><input type="checkbox" data-path="esp.box2d" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">3D box</div></div><label class="switch"><input type="checkbox" data-path="esp.box3d" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Skeleton</div></div><label class="switch"><input type="checkbox" data-path="esp.skeleton" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Names</div></div><label class="switch"><input type="checkbox" data-path="esp.names" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Distance</div></div><label class="switch"><input type="checkbox" data-path="esp.distance" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Health bars</div></div><label class="switch"><input type="checkbox" data-path="esp.health" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Visibility</div><div class="row-help">VIS if the head is clear of cover, OCC if a crate blocks it.</div></div><label class="switch"><input type="checkbox" data-path="esp.visibility" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Teammates</div></div><label class="switch"><input type="checkbox" data-path="esp.teammates"><i></i></label></div>
+          <div class="row"><div><div class="row-title">Color by visibility</div></div><label class="switch"><input type="checkbox" data-path="esp.colorByVisibility" checked><i></i></label></div>
+          <h3>Style</h3>
+          <label class="field"><span class="field-top"><span>Max distance</span><span class="val" data-for="esp.maxDistance">80</span></span><input type="range" min="15" max="120" step="1" value="80" data-path="esp.maxDistance"></label>
+          <label class="field"><span class="field-top"><span>Thickness</span><span class="val" data-for="esp.thickness">1.6</span></span><input type="range" min="1" max="4" step="0.1" value="1.6" data-path="esp.thickness"></label>
+          <label class="field"><span class="field-top"><span>Opacity</span><span class="val" data-for="esp.opacity">92%</span></span><input type="range" min="25" max="100" step="1" value="92" data-path="esp.opacity"></label>
+          <h3>Colors</h3>
+          <div class="colors">
+            <label>Box <input type="color" data-path="esp.colors.box" value="#6aa6ff"></label>
+            <label>Skeleton <input type="color" data-path="esp.colors.skeleton" value="#c084fc"></label>
+            <label>Name <input type="color" data-path="esp.colors.name" value="#f4f7ff"></label>
+            <label>Visible <input type="color" data-path="esp.colors.visible" value="#3ee0a2"></label>
+            <label>Occluded <input type="color" data-path="esp.colors.occluded" value="#ffb020"></label>
+            <label>Friendly <input type="color" data-path="esp.colors.friendly" value="#49e0c2"></label>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="assist">
+          <h2>Aim Assist</h2>
+          <p class="lede">A soft camera pull toward a dummy inside the FOV circle. Strength and smoothing stay in this page.</p>
+          <div class="row"><div><div class="row-title">Enable</div></div><label class="switch"><input type="checkbox" data-path="assist.enabled"><i></i></label></div>
+          <label class="field"><span class="field-top"><span>Strength</span><span class="val" data-for="assist.strength">35</span></span><input type="range" min="0" max="100" step="1" value="35" data-path="assist.strength"></label>
+          <label class="field"><span class="field-top"><span>FOV radius</span><span class="val" data-for="assist.fov">32°</span></span><input type="range" min="2" max="90" step="1" value="32" data-path="assist.fov"></label>
+          <label class="field"><span class="field-top"><span>Smoothness</span><span class="val" data-for="assist.smoothness">48</span></span><input type="range" min="0" max="100" step="1" value="48" data-path="assist.smoothness"></label>
+          <label class="field"><span class="field-top"><span>Target selection</span></span>
+            <select data-path="assist.priority">
+              <option value="crosshair">Closest to crosshair</option>
+              <option value="distance">Nearest distance</option>
+              <option value="health">Lowest health</option>
+            </select>
+          </label>
+          <label class="field"><span class="field-top"><span>Aim point</span></span>
+            <select data-path="assist.bone">
+              <option value="head">Head</option>
+              <option value="neck">Neck</option>
+              <option value="chest" selected>Chest</option>
+              <option value="pelvis">Pelvis</option>
+            </select>
+          </label>
+          <div class="row"><div><div class="row-title">Visible targets only</div></div><label class="switch"><input type="checkbox" data-path="assist.visibleOnly" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Include teammates</div></div><label class="switch"><input type="checkbox" data-path="assist.teammates"><i></i></label></div>
+          <div class="row"><div><div class="row-title">Draw FOV circle</div></div><label class="switch"><input type="checkbox" data-path="assist.drawFov" checked><i></i></label></div>
+          <div class="readout" id="assist-readout">No target inside the assist FOV</div>
+        </section>
+
+        <section class="panel" data-panel="aimbot">
+          <h2>Aimbot</h2>
+          <p class="lede">Hold the key to ease the simulation camera onto a chosen bone. The system cursor never moves.</p>
+          <div class="row"><div><div class="row-title">Enable</div></div><label class="switch"><input type="checkbox" data-path="aimbot.enabled"><i></i></label></div>
+          <label class="field"><span class="field-top"><span>FOV radius</span><span class="val" data-for="aimbot.fov">20°</span></span><input type="range" min="2" max="90" step="1" value="20" data-path="aimbot.fov"></label>
+          <label class="field"><span class="field-top"><span>Smoothness</span><span class="val" data-for="aimbot.smoothness">24</span></span><input type="range" min="0" max="100" step="1" value="24" data-path="aimbot.smoothness"></label>
+          <label class="field"><span class="field-top"><span>Target bone</span></span>
+            <select data-path="aimbot.bone">
+              <option value="head" selected>Head</option>
+              <option value="neck">Neck</option>
+              <option value="chest">Chest</option>
+              <option value="pelvis">Pelvis</option>
+            </select>
+          </label>
+          <label class="field"><span class="field-top"><span>Priority</span></span>
+            <select data-path="aimbot.priority">
+              <option value="crosshair">Closest to crosshair</option>
+              <option value="distance">Nearest distance</option>
+              <option value="health">Lowest health</option>
+            </select>
+          </label>
+          <div class="row">
+            <div><div class="row-title">Hold key</div><div class="row-help">Click, then press a key or mouse button.</div></div>
+            <button type="button" class="key" data-key="aimbot.hotkey">Q</button>
+          </div>
+          <div class="row"><div><div class="row-title">Sticky target</div><div class="row-help">Keep the current lock until it leaves the FOV.</div></div><label class="switch"><input type="checkbox" data-path="aimbot.sticky" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Target line</div></div><label class="switch"><input type="checkbox" data-path="aimbot.drawLine" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Visible targets only</div></div><label class="switch"><input type="checkbox" data-path="aimbot.visibleOnly" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Include teammates</div></div><label class="switch"><input type="checkbox" data-path="aimbot.teammates"><i></i></label></div>
+          <div class="readout" id="aim-readout">No target inside the aimbot FOV</div>
+        </section>
+
+        <section class="panel" data-panel="trigger">
+          <h2>Triggerbot</h2>
+          <p class="lede">When the crosshair covers a dummy and the key is held, a shot is simulated after the reaction delay.</p>
+          <div class="row"><div><div class="row-title">Enable</div></div><label class="switch"><input type="checkbox" data-path="trigger.enabled"><i></i></label></div>
+          <label class="field"><span class="field-top"><span>Reaction delay</span><span class="val" data-for="trigger.delay">120 ms</span></span><input type="range" min="0" max="400" step="5" value="120" data-path="trigger.delay"></label>
+          <label class="field"><span class="field-top"><span>Detection scale</span><span class="val" data-for="trigger.scale">1.00×</span></span><input type="range" min="0.6" max="2" step="0.05" value="1" data-path="trigger.scale"></label>
+          <div class="row">
+            <div><div class="row-title">Activation key</div><div class="row-help">Hold it while the crosshair is on a dummy.</div></div>
+            <button type="button" class="key" data-key="trigger.hotkey">T</button>
+          </div>
+          <div class="row"><div><div class="row-title">Visible targets only</div></div><label class="switch"><input type="checkbox" data-path="trigger.visibleOnly" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Include teammates</div></div><label class="switch"><input type="checkbox" data-path="trigger.teammates"><i></i></label></div>
+          <div class="readout" id="trigger-readout">Crosshair is clear</div>
+        </section>
+
+        <section class="panel" data-panel="visuals">
+          <h2>Visuals</h2>
+          <p class="lede">Crosshair, recoil pattern, and the camera field of view. These draw on the overlay, not in the menu.</p>
+          <h3>Crosshair</h3>
+          <div class="row"><div><div class="row-title">Show crosshair</div></div><label class="switch"><input type="checkbox" data-path="crosshair.enabled" checked><i></i></label></div>
+          <label class="field"><span class="field-top"><span>Style</span></span>
+            <select data-path="crosshair.style">
+              <option value="cross" selected>Cross</option>
+              <option value="dot">Dot</option>
+              <option value="circle">Circle</option>
+              <option value="chevron">Chevron</option>
+            </select>
+          </label>
+          <div class="colors colors-single">
+            <label>Color <input type="color" data-path="crosshair.color" value="#e7f2ff"></label>
+          </div>
+          <label class="field"><span class="field-top"><span>Size</span><span class="val" data-for="crosshair.size">8</span></span><input type="range" min="3" max="22" step="1" value="8" data-path="crosshair.size"></label>
+          <label class="field"><span class="field-top"><span>Gap</span><span class="val" data-for="crosshair.gap">4</span></span><input type="range" min="0" max="16" step="1" value="4" data-path="crosshair.gap"></label>
+          <label class="field"><span class="field-top"><span>Thickness</span><span class="val" data-for="crosshair.thickness">1.6</span></span><input type="range" min="1" max="4" step="0.1" value="1.6" data-path="crosshair.thickness"></label>
+          <div class="row"><div><div class="row-title">Outline</div></div><label class="switch"><input type="checkbox" data-path="crosshair.outline" checked><i></i></label></div>
+          <h3>Recoil</h3>
+          <div class="row"><div><div class="row-title">Recoil kick</div><div class="row-help">Left click the range to spray. The pattern sits in the corner.</div></div><label class="switch"><input type="checkbox" data-path="recoil.enabled" checked><i></i></label></div>
+          <label class="field"><span class="field-top"><span>Strength</span><span class="val" data-for="recoil.strength">45</span></span><input type="range" min="0" max="100" step="1" value="45" data-path="recoil.strength"></label>
+          <div class="row"><div><div class="row-title">Pattern widget</div></div><label class="switch"><input type="checkbox" data-path="recoil.showPattern" checked><i></i></label></div>
+          <h3>View</h3>
+          <label class="field"><span class="field-top"><span>Camera FOV</span><span class="val" data-for="camera.fov">75°</span></span><input type="range" min="50" max="110" step="1" value="75" data-path="camera.fov"></label>
+        </section>
+
+        <section class="panel" data-panel="system">
+          <h2>Settings</h2>
+          <p class="lede">Population, speed, and which overlay readouts stay visible with the menu closed.</p>
+          <h3>Simulation</h3>
+          <label class="field"><span class="field-top"><span>Player count</span><span class="val" data-for="sim.playerCount">10</span></span><input type="range" min="4" max="24" step="1" value="10" data-path="sim.playerCount"></label>
+          <label class="field"><span class="field-top"><span>Sim speed</span><span class="val" data-for="sim.speed">1.00×</span></span><input type="range" min="0.25" max="2" step="0.05" value="1" data-path="sim.speed"></label>
+          <h3>Overlay readouts</h3>
+          <div class="row"><div><div class="row-title">FPS counter</div></div><label class="switch"><input type="checkbox" data-path="hud.fps" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Performance details</div></div><label class="switch"><input type="checkbox" data-path="hud.perf" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Player card</div></div><label class="switch"><input type="checkbox" data-path="hud.playerInfo" checked><i></i></label></div>
+          <div class="row"><div><div class="row-title">Menu hint</div></div><label class="switch"><input type="checkbox" data-path="hud.hint" checked><i></i></label></div>
+          <h3>Keys</h3>
+          <ul class="keys">
+            <li><span>Insert</span> Show or hide the menu</li>
+            <li><span>F2</span> Toggle ESP without opening the menu</li>
+            <li><span>WASD</span> Move · right mouse looks</li>
+            <li><span>Left click</span> Simulated shot and recoil</li>
+            <li><span>Q / T</span> Default aimbot and triggerbot holds</li>
+          </ul>
+          <button type="button" class="reset" id="reset">Reset settings</button>
+        </section>
+      </div>
+    </div>
+    <footer class="menu-foot">
+      <span id="bind-note">Insert toggles this menu. F2 toggles ESP.</span>
+      <span>Dummy players only. This page does not attach to a game.</span>
+    </footer>
+  </aside>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
