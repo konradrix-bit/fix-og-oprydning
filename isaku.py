@@ -20,14 +20,21 @@ FOUND_FILE = ROOT / "fundet.txt"
 GUNS_URL = "https://guns.lol/{name}"
 CLAIM_URL = "https://guns.lol/register?claim={name}&ref=claim_user_page"
 DISCORD_URL = "https://discord.com/api/v9/unique-username/username-attempt-unauthed"
+ROBLOX_URL = "https://auth.roblox.com/v1/usernames/validate"
+FORTNITE_URL = "https://www.epicgames.com/id/api/account/displayName/validate"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/131.0.0.0 Safari/537.36"
 )
-GUNS_DELAY = 0.35
-DISCORD_DELAY = 1.2
-PLACES = {"guns": "guns.lol", "discord": "Discord"}
+DELAYS = {"guns": 0.35, "discord": 1.2, "fortnite": 0.8, "roblox": 0.45}
+MIN_LENGTH = {"guns": 2, "discord": 2, "fortnite": 3, "roblox": 3}
+PLACES = {
+    "guns": "guns.lol",
+    "discord": "Discord",
+    "fortnite": "Fortnite",
+    "roblox": "Roblox",
+}
 WEBHOOK_HOSTS = {
     "discord.com",
     "discordapp.com",
@@ -73,12 +80,14 @@ COPY = {
         "count_hint": "Hvor mange ledige navne vil du have?",
         "count_bad": "Skriv et helt tal over 0.",
         "names_label": "Navne",
-        "names_hint": "3 bogstaver    4 bogstaver    5 andre navne",
-        "names_bad": "Skriv 3, 4 eller 5.",
+        "names_hint": "2 bogstaver    3 bogstaver    4 bogstaver    5 andre navne",
+        "names_bad": "Skriv 2, 3, 4 eller 5.",
         "place_label": "Sted",
-        "place_hint": "1 guns.lol    2 discord    3 begge",
-        "place_bad": "Skriv 1, 2 eller 3.",
-        "tagline": "finder ledige navne på guns.lol og discord",
+        "place_hint": "1 guns.lol    2 discord    3 fortnite    4 roblox    5 alle",
+        "place_bad": "Skriv 1, 2, 3, 4 eller 5.",
+        "tagline": "finder ledige navne på guns.lol, discord, fortnite og roblox",
+        "too_short": "{place} tillader ikke navne under {minimum} bogstaver, så det sted springes over.",
+        "platform_blocked": "{place} svarede ikke, så det sted stoppes.",
         "mixing_letters": "blander {count} {place}-navne på {length} bogstaver...",
         "mixing_other": "laver andre {place}-navne...",
         "searching": "leder efter {target} ledige {place}-navne",
@@ -105,7 +114,7 @@ COPY = {
         "load": [
             "starter isaku",
             "åbner session",
-            "forbinder til guns.lol og discord",
+            "forbinder til siderne",
             "klargør webhook",
             "bygger navne",
             "sidste detaljer",
@@ -119,12 +128,14 @@ COPY = {
         "count_hint": "How many free names do you want?",
         "count_bad": "Enter a whole number above 0.",
         "names_label": "Names",
-        "names_hint": "3 letters    4 letters    5 other names",
-        "names_bad": "Enter 3, 4 or 5.",
+        "names_hint": "2 letters    3 letters    4 letters    5 other names",
+        "names_bad": "Enter 2, 3, 4 or 5.",
         "place_label": "Where",
-        "place_hint": "1 guns.lol    2 discord    3 both",
-        "place_bad": "Enter 1, 2 or 3.",
-        "tagline": "finds free names on guns.lol and discord",
+        "place_hint": "1 guns.lol    2 discord    3 fortnite    4 roblox    5 all",
+        "place_bad": "Enter 1, 2, 3, 4 or 5.",
+        "tagline": "finds free names on guns.lol, discord, fortnite and roblox",
+        "too_short": "{place} does not allow names under {minimum} letters, so that site is skipped.",
+        "platform_blocked": "{place} did not answer, so that site is stopped.",
         "mixing_letters": "shuffling {count} {place} names of {length} letters...",
         "mixing_other": "making other {place} names...",
         "searching": "looking for {target} free {place} names",
@@ -151,7 +162,7 @@ COPY = {
         "load": [
             "starting isaku",
             "opening session",
-            "connecting to guns.lol and discord",
+            "connecting to the sites",
             "preparing webhook",
             "building names",
             "last details",
@@ -218,7 +229,7 @@ def paint_watermark() -> int:
     for line in lines:
         write_centered(line, BOLD + PURPLE)
     write_centered("━" * art_width, PURPLE_DEEP)
-    write_centered("guns.lol   ·   discord", PURPLE_SOFT + DIM)
+    write_centered("guns · discord · fortnite · roblox", PURPLE_SOFT + DIM)
     sys.stdout.flush()
     return len(lines) + 3
 
@@ -319,7 +330,7 @@ def loading_screen() -> None:
                 rule = "━" * art_width
                 for index, char in enumerate(rule):
                     put(grid, rest_row + art_height, pad + index, char, PURPLE_DEEP)
-                subtitle = "guns.lol   ·   discord"
+                subtitle = "guns · discord · fortnite · roblox"
                 sub_pad = pad + max(0, (art_width - len(subtitle)) // 2)
                 for index, char in enumerate(subtitle):
                     put(grid, rest_row + art_height + 1, sub_pad + index, char, DIM + PURPLE_SOFT)
@@ -404,6 +415,8 @@ def prompt_count() -> int:
 def prompt_mode() -> str:
     while True:
         value = ask(t("names_label"), t("names_hint")).lower()
+        if value in {"2", "two", "to"}:
+            return "2"
         if value in {"3", "three", "tre"}:
             return "3"
         if value in {"4", "four", "fire"}:
@@ -414,14 +427,35 @@ def prompt_mode() -> str:
 
 
 def prompt_places() -> list[str]:
+    order = ["guns", "discord", "fortnite", "roblox"]
+    words = {
+        "1": "guns",
+        "guns": "guns",
+        "guns.lol": "guns",
+        "2": "discord",
+        "discord": "discord",
+        "dc": "discord",
+        "3": "fortnite",
+        "fortnite": "fortnite",
+        "fn": "fortnite",
+        "4": "roblox",
+        "roblox": "roblox",
+    }
     while True:
         value = ask(t("place_label"), t("place_hint")).lower()
-        if value in {"1", "guns", "guns.lol"}:
-            return ["guns"]
-        if value in {"2", "discord", "dc"}:
-            return ["discord"]
-        if value in {"3", "begge", "alle", "both"}:
-            return ["guns", "discord"]
+        if value in {"5", "alle", "all", "begge", "both"}:
+            return list(order)
+        chosen = []
+        valid = True
+        for part in value.replace(",", " ").split():
+            place = words.get(part)
+            if place is None:
+                valid = False
+                break
+            if place not in chosen:
+                chosen.append(place)
+        if valid and chosen:
+            return chosen
         write(f"  {ROSE}{t('place_bad')}{RESET}")
 
 
@@ -597,6 +631,100 @@ class DiscordChecker:
         return "error"
 
 
+class RobloxChecker:
+    """Uses Roblox's public signup check. It does not create an account."""
+
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "User-Agent": USER_AGENT,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+        )
+
+    def _body(self, name: str) -> dict[str, str]:
+        return {
+            "username": name,
+            "birthday": "2000-01-01T00:00:00.000Z",
+            "context": "Signup",
+        }
+
+    def check(self, name: str) -> str:
+        for _attempt in range(4):
+            try:
+                response = self.session.post(ROBLOX_URL, json=self._body(name), timeout=20)
+            except requests.RequestException:
+                time.sleep(1.0)
+                continue
+            if response.status_code == 403:
+                token = response.headers.get("x-csrf-token")
+                if token:
+                    self.session.headers["x-csrf-token"] = token
+                    continue
+            if response.status_code == 429:
+                time.sleep(2.0)
+                continue
+            if response.status_code != 200:
+                time.sleep(0.8)
+                continue
+            try:
+                code = response.json().get("code")
+            except ValueError:
+                return "error"
+            if code == 0:
+                return "free"
+            return "taken"
+        return "error"
+
+
+class FortniteChecker:
+    """Uses Epic's display-name check from the signup page. It does not create an account."""
+
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "User-Agent": USER_AGENT,
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+                "Origin": "https://www.epicgames.com",
+                "Referer": "https://www.epicgames.com/id/register",
+            }
+        )
+        self.ready = False
+
+    def _prepare(self) -> None:
+        if self.ready:
+            return
+        self.session.get("https://www.epicgames.com/id/api/location", timeout=20)
+        token = self.session.cookies.get("XSRF-TOKEN")
+        if token:
+            self.session.headers["X-XSRF-TOKEN"] = token
+        self.ready = True
+
+    def check(self, name: str) -> str:
+        for attempt in range(3):
+            try:
+                self._prepare()
+                response = self.session.post(
+                    FORTNITE_URL, json={"displayName": name}, timeout=20
+                )
+            except requests.RequestException:
+                time.sleep(1.0 + attempt)
+                continue
+            if response.status_code == 204:
+                return "free"
+            if response.status_code == 400:
+                return "taken"
+            if response.status_code == 429:
+                time.sleep(2.0 + attempt)
+                continue
+            return "error"
+        return "error"
+
+
 def retry_after(response: requests.Response) -> float:
     try:
         payload = response.json()
@@ -675,7 +803,7 @@ def clear_status() -> None:
 def hunt(webhook: str, target: int, mode: str, platform: str) -> list[tuple[str, str]]:
     known = load_known(platform)
     place = PLACES[platform]
-    delay = DISCORD_DELAY if platform == "discord" else GUNS_DELAY
+    delay = DELAYS[platform]
     write()
     if mode == "other":
         mixing = t("mixing_other", place=place)
@@ -688,9 +816,16 @@ def hunt(webhook: str, target: int, mode: str, platform: str) -> list[tuple[str,
         )
     write(f"  {MUTED}{mixing}{RESET}")
     names = build_names(mode, known)
-    checker: Checker | DiscordChecker = DiscordChecker() if platform == "discord" else Checker()
+    checkers = {
+        "guns": Checker,
+        "discord": DiscordChecker,
+        "fortnite": FortniteChecker,
+        "roblox": RobloxChecker,
+    }
+    checker = checkers[platform]()
     found: list[tuple[str, str]] = []
     checked = 0
+    errors = 0
 
     write()
     search_key = "searching_one" if target == 1 else "searching"
@@ -708,6 +843,15 @@ def hunt(webhook: str, target: int, mode: str, platform: str) -> list[tuple[str,
             checked += 1
             status_line(platform, name, checked, len(found), target)
             result = checker.check(name)
+            if result == "error":
+                errors += 1
+                if errors >= 3:
+                    clear_status()
+                    write(f"  {ROSE}{t('platform_blocked', place=place)}{RESET}")
+                    break
+                time.sleep(delay)
+                continue
+            errors = 0
             if result != "free":
                 time.sleep(delay)
                 continue
@@ -766,12 +910,20 @@ def main() -> None:
     mode = prompt_mode()
     places = prompt_places()
     found: list[tuple[str, str]] = []
+    active = 0
     try:
         for platform in places:
+            if mode != "other" and int(mode) < MIN_LENGTH[platform]:
+                write()
+                write(
+                    f"  {ROSE}{t('too_short', place=PLACES[platform], minimum=MIN_LENGTH[platform])}{RESET}"
+                )
+                continue
+            active += 1
             found.extend(hunt(webhook, target, mode, platform))
     except KeyboardInterrupt:
         pass
-    finish(found, target * len(places))
+    finish(found, target * active if active else target)
 
 
 if __name__ == "__main__":
