@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ISAKU — finder ledige 3- og 4-bogstavsnavne på guns.lol og Discord og sender dem til en webhook."""
+"""ISAKU — finds free guns.lol and Discord names and sends them to a webhook."""
 
 from __future__ import annotations
 
@@ -62,6 +62,111 @@ INK = rgb(245, 243, 255)
 MUTED = rgb(161, 161, 170)
 MINT = rgb(74, 222, 128)
 ROSE = rgb(251, 113, 133)
+
+LANG = "da"
+COPY = {
+    "da": {
+        "webhook_label": "Webhook",
+        "webhook_hint": "Indsæt din Discord-webhook",
+        "webhook_bad": "Det skal være en https-webhook fra discord.com.",
+        "count_label": "Antal",
+        "count_hint": "Hvor mange ledige navne vil du have?",
+        "count_bad": "Skriv et helt tal over 0.",
+        "names_label": "Navne",
+        "names_hint": "3 bogstaver    4 bogstaver    5 andre navne",
+        "names_bad": "Skriv 3, 4 eller 5.",
+        "place_label": "Sted",
+        "place_hint": "1 guns.lol    2 discord    3 begge",
+        "place_bad": "Skriv 1, 2 eller 3.",
+        "tagline": "finder ledige navne på guns.lol og discord",
+        "mixing_letters": "blander {count} {place}-navne på {length} bogstaver...",
+        "mixing_other": "laver andre {place}-navne...",
+        "searching": "leder efter {target} ledige {place}-navne",
+        "searching_one": "leder efter {target} ledigt {place}-navn",
+        "none_left": "Der er ikke flere nye {place}-navne tilbage.",
+        "free": "ledig",
+        "sent": "sendt til webhook",
+        "webhook_status": "webhook svarede {status} {detail}",
+        "webhook_silent": "webhook svarede ikke",
+        "checking": "tjekker",
+        "checked": "tjekket",
+        "free_of": "ledige",
+        "wait": "discord siger vent",
+        "stopped": "stoppet.",
+        "done": "færdig.",
+        "saved": "{count} navne er gemt i fundet.txt",
+        "saved_one": "{count} navn er gemt i fundet.txt",
+        "partial": "færdig med {count} af {target}.",
+        "partial_note": "de fundne navne ligger i fundet.txt",
+        "none": "ingen ledige navne fundet.",
+        "field_letters": "Bogstaver",
+        "field_place": "Sted",
+        "title": "Ledigt {place} navn",
+        "load": [
+            "starter isaku",
+            "åbner session",
+            "forbinder til guns.lol og discord",
+            "klargør webhook",
+            "bygger navne",
+            "sidste detaljer",
+        ],
+    },
+    "en": {
+        "webhook_label": "Webhook",
+        "webhook_hint": "Paste your Discord webhook",
+        "webhook_bad": "It has to be an https webhook from discord.com.",
+        "count_label": "Amount",
+        "count_hint": "How many free names do you want?",
+        "count_bad": "Enter a whole number above 0.",
+        "names_label": "Names",
+        "names_hint": "3 letters    4 letters    5 other names",
+        "names_bad": "Enter 3, 4 or 5.",
+        "place_label": "Where",
+        "place_hint": "1 guns.lol    2 discord    3 both",
+        "place_bad": "Enter 1, 2 or 3.",
+        "tagline": "finds free names on guns.lol and discord",
+        "mixing_letters": "shuffling {count} {place} names of {length} letters...",
+        "mixing_other": "making other {place} names...",
+        "searching": "looking for {target} free {place} names",
+        "searching_one": "looking for {target} free {place} name",
+        "none_left": "No new {place} names left.",
+        "free": "free",
+        "sent": "sent to webhook",
+        "webhook_status": "webhook replied {status} {detail}",
+        "webhook_silent": "webhook did not reply",
+        "checking": "checking",
+        "checked": "checked",
+        "free_of": "free",
+        "wait": "discord says wait",
+        "stopped": "stopped.",
+        "done": "done.",
+        "saved": "{count} names saved in fundet.txt",
+        "saved_one": "{count} name saved in fundet.txt",
+        "partial": "finished with {count} of {target}.",
+        "partial_note": "found names are in fundet.txt",
+        "none": "no free names found.",
+        "field_letters": "Letters",
+        "field_place": "Where",
+        "title": "Free {place} name",
+        "load": [
+            "starting isaku",
+            "opening session",
+            "connecting to guns.lol and discord",
+            "preparing webhook",
+            "building names",
+            "last details",
+        ],
+    },
+}
+
+
+def t(key: str, **kwargs: object) -> str:
+    return str(COPY[LANG][key]).format(**kwargs)
+
+
+def format_count(value: int) -> str:
+    text = f"{value:,}"
+    return text.replace(",", ".") if LANG == "da" else text
 
 
 def setup_console() -> None:
@@ -128,7 +233,28 @@ def ease(progress: float) -> float:
     return progress * progress * (3 - 2 * progress)
 
 
-def loading_frame(percent: int, message: str) -> list[str]:
+def banner_cells() -> tuple[list[tuple[int, int, str]], int, int]:
+    source = BANNER.splitlines()
+    width = max(len(item) for item in source)
+    raw = [item.ljust(width) for item in source]
+    cells = []
+    for row, line in enumerate(raw):
+        for col, char in enumerate(line):
+            if char != " ":
+                cells.append((col, row, char))
+    return cells, len(raw[0]), len(raw)
+
+
+def fall_offset(progress: float, column: int, drop: int) -> int:
+    """How many rows a glyph still has to fall. 0 means it has landed."""
+    lag = (column % 6) * 0.07
+    span = max(0.25, 1 - lag)
+    local = min(1.0, max(0.0, (progress - lag) / span))
+    landed = 1 - (1 - local) ** 3
+    return int(round((1 - landed) * drop))
+
+
+def loading_frame(percent: int, message: str) -> list[tuple[str, str]]:
     bar_width = 32
     filled = round(bar_width * percent / 100)
     bar = "█" * filled + "░" * (bar_width - filled)
@@ -138,48 +264,82 @@ def loading_frame(percent: int, message: str) -> list[str]:
         value = value[:inner]
         return value + " " * (inner - len(value))
 
-    return [
-        "┌" + "─" * (inner + 2) + "┐",
-        "│ " + fit("LOADING") + " │",
-        "│ " + fit(f"{bar}  {percent:3d}%") + " │",
-        "│ " + fit(message) + " │",
-        "└" + "─" * (inner + 2) + "┘",
+    rows = [
+        ("┌" + "─" * (inner + 2) + "┐", PURPLE),
+        ("│ " + fit("LOADING") + " │", BOLD + PURPLE_HOT),
+        ("│ " + fit(f"{bar}  {percent:3d}%") + " │", PURPLE),
+        ("│ " + fit(message) + " │", PURPLE_SOFT),
+        ("└" + "─" * (inner + 2) + "┘", PURPLE),
     ]
+    return rows
+
+
+def paint_grid(grid: list[list[tuple[str, str]]]) -> None:
+    sys.stdout.write("\033[H")
+    for row in grid:
+        line = []
+        for char, color in row:
+            line.append(f"{color}{char}" if color else char)
+        sys.stdout.write("".join(line) + RESET + "\033[K\n")
+    sys.stdout.flush()
+
+
+def put(grid: list[list[tuple[str, str]]], row: int, col: int, char: str, color: str) -> None:
+    if row < 0 or col < 0 or row >= len(grid) or col >= len(grid[0]) or char == " ":
+        return
+    grid[row][col] = (char, color)
 
 
 def loading_screen() -> None:
-    clear_screen()
+    cells, art_width, art_height = banner_cells()
+    drop = 11
+    fall_frames = 26
+    bar_frames = 28
+    rest_row = 1
+    pad = max(0, (terminal_width() - art_width) // 2)
+    box_slot = rest_row + art_height + 2
+    screen_rows = box_slot + 7
+    screen_cols = max(terminal_width(), art_width + pad + 2)
+    messages = COPY[LANG]["load"]
     sys.stdout.write(HIDE_CURSOR)
+    clear_screen()
     try:
-        used = paint_watermark()
-        write()
-        origin = used + 2
-        started = time.perf_counter()
-        duration = 3.6
-        messages = (
-            (0.00, "starter isaku"),
-            (0.16, "åbner session"),
-            (0.34, "forbinder til guns.lol og discord"),
-            (0.52, "klargør webhook"),
-            (0.70, "bygger bogstavrum"),
-            (0.86, "sidste detaljer"),
-        )
-        while True:
-            progress = min(1.0, (time.perf_counter() - started) / duration)
-            percent = int(ease(progress) * 100)
-            message = messages[0][1]
-            for threshold, label in messages:
-                if progress >= threshold:
-                    message = label
-            frame = loading_frame(percent, message)
-            colors = (PURPLE, BOLD + PURPLE_HOT, PURPLE, PURPLE_SOFT, PURPLE)
-            for offset, (line, color) in enumerate(zip(frame, colors)):
-                sys.stdout.write(f"\033[{origin + offset};1H{color}{center(line)}{RESET}")
-            sys.stdout.flush()
-            if progress >= 1:
+        total = fall_frames + bar_frames
+        for frame in range(total + 1):
+            grid = [[(" ", "")] * screen_cols for _ in range(screen_rows)]
+            fall_progress = min(1.0, frame / fall_frames)
+            for col, row, char in cells:
+                offset = fall_offset(fall_progress, col, drop)
+                y = rest_row + row - offset
+                put(grid, y, pad + col, char, BOLD + PURPLE)
+                if offset > 0:
+                    put(grid, y - 1, pad + col, char, PURPLE_DEEP)
+                    put(grid, y - 2, pad + col, "·", DIM + PURPLE_DEEP)
+            if fall_progress >= 0.92:
+                rule = "━" * art_width
+                for index, char in enumerate(rule):
+                    put(grid, rest_row + art_height, pad + index, char, PURPLE_DEEP)
+                subtitle = "guns.lol   ·   discord"
+                sub_pad = pad + max(0, (art_width - len(subtitle)) // 2)
+                for index, char in enumerate(subtitle):
+                    put(grid, rest_row + art_height + 1, sub_pad + index, char, DIM + PURPLE_SOFT)
+            if frame >= fall_frames:
+                bar_progress = (frame - fall_frames) / bar_frames
+                percent = int(ease(bar_progress) * 100)
+                message = messages[min(len(messages) - 1, int(bar_progress * len(messages)))]
+                box = loading_frame(percent, message)
+                box_drop = int(round((1 - ease(bar_progress)) * 5))
+                box_width = len(box[0][0])
+                box_pad = max(0, (screen_cols - box_width) // 2)
+                for line_index, (text, color) in enumerate(box):
+                    y = box_slot + line_index - box_drop
+                    for index, char in enumerate(text):
+                        put(grid, y, box_pad + index, char, color)
+            paint_grid(grid)
+            if frame == total:
                 break
-            time.sleep(0.045)
-        time.sleep(0.45)
+            time.sleep(0.04)
+        time.sleep(0.28)
     finally:
         sys.stdout.write(SHOW_CURSOR)
         sys.stdout.flush()
@@ -204,40 +364,65 @@ def valid_webhook(url: str) -> bool:
     )
 
 
+def prompt_language() -> None:
+    global LANG
+    clear_screen()
+    write()
+    write_centered("ISAKU", BOLD + PURPLE)
+    write()
+    write(f"  {PURPLE}Sprog / Language{RESET}")
+    write(f"  {MUTED}1 Dansk    2 English{RESET}")
+    while True:
+        sys.stdout.write(f"  {PURPLE_HOT}›{RESET} ")
+        sys.stdout.flush()
+        value = input().strip().lower()
+        if value in {"1", "da", "dansk", "danish"}:
+            LANG = "da"
+            return
+        if value in {"2", "en", "engelsk", "english"}:
+            LANG = "en"
+            return
+        write(f"  {ROSE}1 eller 2  /  1 or 2{RESET}")
+
+
 def prompt_webhook() -> str:
     while True:
-        value = ask("Webhook", "Indsæt din Discord-webhook")
+        value = ask(t("webhook_label"), t("webhook_hint"))
         if valid_webhook(value):
             return value.strip()
-        write(f"  {ROSE}Det skal være en https-webhook fra discord.com.{RESET}")
+        write(f"  {ROSE}{t('webhook_bad')}{RESET}")
 
 
 def prompt_count() -> int:
     while True:
-        value = ask("Antal", "Hvor mange ledige navne vil du have?")
+        value = ask(t("count_label"), t("count_hint"))
         if value.isdigit() and int(value) > 0:
             return int(value)
-        write(f"  {ROSE}Skriv et helt tal over 0.{RESET}")
+        write(f"  {ROSE}{t('count_bad')}{RESET}")
 
 
-def prompt_length() -> int:
+def prompt_mode() -> str:
     while True:
-        value = ask("Bogstaver", "Vælg 3 eller 4")
-        if value in {"3", "4"}:
-            return int(value)
-        write(f"  {ROSE}Skriv 3 eller 4.{RESET}")
+        value = ask(t("names_label"), t("names_hint")).lower()
+        if value in {"3", "three", "tre"}:
+            return "3"
+        if value in {"4", "four", "fire"}:
+            return "4"
+        if value in {"5", "other", "others", "andre", "andre navne", "names", "other names"}:
+            return "other"
+        write(f"  {ROSE}{t('names_bad')}{RESET}")
 
 
 def prompt_places() -> list[str]:
     while True:
-        value = ask("Sted", "1 guns.lol    2 discord    3 begge").lower()
+        value = ask(t("place_label"), t("place_hint")).lower()
         if value in {"1", "guns", "guns.lol"}:
             return ["guns"]
         if value in {"2", "discord", "dc"}:
             return ["discord"]
         if value in {"3", "begge", "alle", "both"}:
             return ["guns", "discord"]
-        write(f"  {ROSE}Skriv 1, 2 eller 3.{RESET}")
+        write(f"  {ROSE}{t('place_bad')}{RESET}")
 
 
 def load_known(platform: str) -> set[str]:
@@ -262,7 +447,7 @@ def remember(platform: str, name: str) -> None:
         handle.write(f"{platform}:{name}\n")
 
 
-def build_names(length: int, skip: set[str]) -> list[str]:
+def build_letter_names(length: int, skip: set[str]) -> list[str]:
     alphabet = string.ascii_lowercase
     names = []
     for chars in itertools.product(alphabet, repeat=length):
@@ -271,6 +456,30 @@ def build_names(length: int, skip: set[str]) -> list[str]:
             names.append(name)
     random.shuffle(names)
     return names
+
+
+def build_other_names(skip: set[str]) -> list[str]:
+    """Pronounceable names, not a full 3- or 4-letter sweep."""
+    consonants = "bcdfghjklmnpqrstvwxyz"
+    vowels = "aeiou"
+    patterns = ("cvc", "cvcv", "cvcc", "vcv", "cvvc", "cvcvc")
+    names: set[str] = set()
+    tries = 0
+    while len(names) < 6000 and tries < 20000:
+        tries += 1
+        pattern = random.choice(patterns)
+        name = "".join(random.choice(vowels if kind == "v" else consonants) for kind in pattern)
+        if name not in skip:
+            names.add(name)
+    pool = list(names)
+    random.shuffle(pool)
+    return pool
+
+
+def build_names(mode: str, skip: set[str]) -> list[str]:
+    if mode == "other":
+        return build_other_names(skip)
+    return build_letter_names(int(mode), skip)
 
 
 class Checker:
@@ -334,7 +543,7 @@ def wait_out(seconds: float) -> None:
             break
         mins, secs = divmod(int(left) + 1, 60)
         sys.stdout.write(
-            f"\r  {ROSE}discord siger vent{RESET}  {PURPLE_HOT}{mins:02d}:{secs:02d}{RESET}   "
+            f"\r  {ROSE}{t('wait')}{RESET}  {PURPLE_HOT}{mins:02d}:{secs:02d}{RESET}   "
         )
         sys.stdout.flush()
         time.sleep(min(1.0, left))
@@ -412,11 +621,11 @@ def send_webhook(webhook: str, platform: str, name: str) -> tuple[bool, str]:
     place = PLACES[platform]
     fields = [
         {"name": "Username", "value": f"`{name}`", "inline": True},
-        {"name": "Bogstaver", "value": str(len(name)), "inline": True},
-        {"name": "Sted", "value": place, "inline": True},
+        {"name": t("field_letters"), "value": str(len(name)), "inline": True},
+        {"name": t("field_place"), "value": place, "inline": True},
     ]
     embed: dict[str, object] = {
-        "title": f"Ledigt {place} navn",
+        "title": t("title", place=place),
         "description": f"```\n{name}\n```",
         "color": 0xA855F7,
         "fields": fields,
@@ -435,7 +644,7 @@ def send_webhook(webhook: str, platform: str, name: str) -> tuple[bool, str]:
             time.sleep(1)
             continue
         if response.status_code in {200, 204}:
-            return True, "sendt til webhook"
+            return True, t("sent")
         if response.status_code == 429:
             try:
                 wait = float(response.json().get("retry_after", 1))
@@ -444,15 +653,15 @@ def send_webhook(webhook: str, platform: str, name: str) -> tuple[bool, str]:
             time.sleep(min(wait, 5))
             continue
         detail = response.text.strip().replace("\n", " ")[:140]
-        return False, f"webhook svarede {response.status_code} {detail}".strip()
-    return False, "webhook svarede ikke"
+        return False, t("webhook_status", status=response.status_code, detail=detail).strip()
+    return False, t("webhook_silent")
 
 
 def status_line(platform: str, current: str, checked: int, found: int, target: int) -> None:
     line = (
         f"  {PURPLE}{PLACES[platform]:<10}{RESET} {INK}{current:<8}{RESET}"
-        f"  {MUTED}tjekket {checked}{RESET}"
-        f"  {PURPLE_HOT}ledige {found}/{target}{RESET}"
+        f"  {MUTED}{t('checked')} {checked}{RESET}"
+        f"  {PURPLE_HOT}{t('free_of')} {found}/{target}{RESET}"
     )
     sys.stdout.write("\r" + line + " " * 8)
     sys.stdout.flush()
@@ -463,27 +672,33 @@ def clear_status() -> None:
     sys.stdout.flush()
 
 
-def hunt(webhook: str, target: int, length: int, platform: str) -> list[tuple[str, str]]:
+def hunt(webhook: str, target: int, mode: str, platform: str) -> list[tuple[str, str]]:
     known = load_known(platform)
     place = PLACES[platform]
     delay = DISCORD_DELAY if platform == "discord" else GUNS_DELAY
     write()
-    write(
-        f"  {MUTED}blander {26 ** length:,} {place}-navne på {length} bogstaver...{RESET}".replace(
-            ",", "."
+    if mode == "other":
+        mixing = t("mixing_other", place=place)
+    else:
+        mixing = t(
+            "mixing_letters",
+            count=format_count(26 ** int(mode)),
+            place=place,
+            length=mode,
         )
-    )
-    names = build_names(length, known)
+    write(f"  {MUTED}{mixing}{RESET}")
+    names = build_names(mode, known)
     checker: Checker | DiscordChecker = DiscordChecker() if platform == "discord" else Checker()
     found: list[tuple[str, str]] = []
     checked = 0
 
     write()
-    write(f"  {PURPLE_SOFT}leder efter {target} ledige {place}-navne{RESET}")
+    search_key = "searching_one" if target == 1 else "searching"
+    write(f"  {PURPLE_SOFT}{t(search_key, target=target, place=place)}{RESET}")
     write()
 
     if not names:
-        write(f"  {ROSE}Der er ikke flere nye {place}-navne tilbage i den længde.{RESET}")
+        write(f"  {ROSE}{t('none_left', place=place)}{RESET}")
         return found
 
     try:
@@ -502,7 +717,7 @@ def hunt(webhook: str, target: int, length: int, platform: str) -> list[tuple[st
             found.append((platform, name))
             ok, note = send_webhook(webhook, platform, name)
             color = MINT if ok else ROSE
-            write(f"  {MINT}ledig{RESET}  {BOLD}{PURPLE_HOT}{name}{RESET}  {MUTED}{place}{RESET}")
+            write(f"  {MINT}{t('free')}{RESET}  {BOLD}{PURPLE_HOT}{name}{RESET}  {MUTED}{place}{RESET}")
             if platform == "guns":
                 write(f"         {MUTED}{claim_url(name)}{RESET}")
             write(f"         {color}{note}{RESET}")
@@ -511,7 +726,7 @@ def hunt(webhook: str, target: int, length: int, platform: str) -> list[tuple[st
     except KeyboardInterrupt:
         clear_status()
         write()
-        write(f"  {ROSE}stoppet.{RESET}")
+        write(f"  {ROSE}{t('stopped')}{RESET}")
         raise
 
     clear_status()
@@ -522,19 +737,20 @@ def show_menu() -> None:
     clear_screen()
     paint_watermark()
     write()
-    write_centered("finder ledige navne på guns.lol og discord", MUTED)
+    write_centered(t("tagline"), MUTED)
 
 
 def finish(found: list[tuple[str, str]], target: int) -> None:
     write()
     write(f"  {PURPLE}{'━' * 42}{RESET}")
     if found and len(found) >= target:
-        write(f"  {MINT}færdig.{RESET} {INK}{len(found)} navne er gemt i fundet.txt{RESET}")
+        saved_key = "saved_one" if len(found) == 1 else "saved"
+        write(f"  {MINT}{t('done')}{RESET} {INK}{t(saved_key, count=len(found))}{RESET}")
     elif found:
-        write(f"  {PURPLE_SOFT}færdig med {len(found)} af {target}.{RESET}")
-        write(f"  {MUTED}de fundne navne ligger i fundet.txt{RESET}")
+        write(f"  {PURPLE_SOFT}{t('partial', count=len(found), target=target)}{RESET}")
+        write(f"  {MUTED}{t('partial_note')}{RESET}")
     else:
-        write(f"  {ROSE}ingen ledige navne fundet.{RESET}")
+        write(f"  {ROSE}{t('none')}{RESET}")
     for platform, name in found:
         write(f"    {PURPLE_HOT}{name}{RESET}  {MUTED}{PLACES[platform]}{RESET}")
     write()
@@ -542,16 +758,17 @@ def finish(found: list[tuple[str, str]], target: int) -> None:
 
 def main() -> None:
     setup_console()
+    prompt_language()
     loading_screen()
     show_menu()
     webhook = prompt_webhook()
     target = prompt_count()
-    length = prompt_length()
+    mode = prompt_mode()
     places = prompt_places()
     found: list[tuple[str, str]] = []
     try:
         for platform in places:
-            found.extend(hunt(webhook, target, length, platform))
+            found.extend(hunt(webhook, target, mode, platform))
     except KeyboardInterrupt:
         pass
     finish(found, target * len(places))
@@ -562,7 +779,7 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         sys.stdout.write(SHOW_CURSOR + "\n")
-        write(f"{ROSE}stoppet.{RESET}")
+        write(f"{ROSE}{t('stopped')}{RESET}")
     finally:
         sys.stdout.write(SHOW_CURSOR)
         sys.stdout.flush()
