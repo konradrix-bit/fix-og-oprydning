@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ISAKU — finder ledige 3- og 4-bogstavsnavne på guns.lol og sender dem til en Discord-webhook."""
+"""ISAKU — finder ledige 3- og 4-bogstavsnavne på guns.lol og Discord og sender dem til en webhook."""
 
 from __future__ import annotations
 
@@ -19,12 +19,15 @@ ROOT = Path(__file__).resolve().parent
 FOUND_FILE = ROOT / "fundet.txt"
 GUNS_URL = "https://guns.lol/{name}"
 CLAIM_URL = "https://guns.lol/register?claim={name}&ref=claim_user_page"
+DISCORD_URL = "https://discord.com/api/v9/unique-username/username-attempt-unauthed"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/131.0.0.0 Safari/537.36"
 )
-DELAY_SECONDS = 0.35
+GUNS_DELAY = 0.35
+DISCORD_DELAY = 1.2
+PLACES = {"guns": "guns.lol", "discord": "Discord"}
 WEBHOOK_HOSTS = {
     "discord.com",
     "discordapp.com",
@@ -110,7 +113,7 @@ def paint_watermark() -> int:
     for line in lines:
         write_centered(line, BOLD + PURPLE)
     write_centered("━" * art_width, PURPLE_DEEP)
-    write_centered("g u n s . l o l", PURPLE_SOFT + DIM)
+    write_centered("guns.lol   ·   discord", PURPLE_SOFT + DIM)
     sys.stdout.flush()
     return len(lines) + 3
 
@@ -156,7 +159,7 @@ def loading_screen() -> None:
         messages = (
             (0.00, "starter isaku"),
             (0.16, "åbner session"),
-            (0.34, "forbinder til guns.lol"),
+            (0.34, "forbinder til guns.lol og discord"),
             (0.52, "klargør webhook"),
             (0.70, "bygger bogstavrum"),
             (0.86, "sidste detaljer"),
@@ -225,20 +228,38 @@ def prompt_length() -> int:
         write(f"  {ROSE}Skriv 3 eller 4.{RESET}")
 
 
-def load_known() -> set[str]:
+def prompt_places() -> list[str]:
+    while True:
+        value = ask("Sted", "1 guns.lol    2 discord    3 begge").lower()
+        if value in {"1", "guns", "guns.lol"}:
+            return ["guns"]
+        if value in {"2", "discord", "dc"}:
+            return ["discord"]
+        if value in {"3", "begge", "alle", "both"}:
+            return ["guns", "discord"]
+        write(f"  {ROSE}Skriv 1, 2 eller 3.{RESET}")
+
+
+def load_known(platform: str) -> set[str]:
     if not FOUND_FILE.exists():
         return set()
     names = set()
     for line in FOUND_FILE.read_text(encoding="utf-8").splitlines():
-        name = line.strip().lower()
-        if name:
-            names.add(name)
+        raw = line.strip().lower()
+        if not raw:
+            continue
+        if ":" in raw:
+            place, _, user = raw.partition(":")
+            if place == platform and user:
+                names.add(user)
+        elif platform == "guns":
+            names.add(raw)
     return names
 
 
-def remember(name: str) -> None:
+def remember(platform: str, name: str) -> None:
     with FOUND_FILE.open("a", encoding="utf-8") as handle:
-        handle.write(name + "\n")
+        handle.write(f"{platform}:{name}\n")
 
 
 def build_names(length: int, skip: set[str]) -> list[str]:
@@ -300,28 +321,111 @@ class Checker:
         return "error"
 
 
+def wait_out(seconds: float) -> None:
+    """Show a countdown while Discord's rate limit is in effect."""
+    seconds = max(0.0, seconds)
+    if seconds < 1.5:
+        time.sleep(seconds)
+        return
+    end = time.perf_counter() + seconds
+    while True:
+        left = end - time.perf_counter()
+        if left <= 0:
+            break
+        mins, secs = divmod(int(left) + 1, 60)
+        sys.stdout.write(
+            f"\r  {ROSE}discord siger vent{RESET}  {PURPLE_HOT}{mins:02d}:{secs:02d}{RESET}   "
+        )
+        sys.stdout.flush()
+        time.sleep(min(1.0, left))
+    sys.stdout.write("\r" + " " * 48 + "\r")
+    sys.stdout.flush()
+
+
+class DiscordChecker:
+    """Checks Discord's public signup endpoint. It does not claim the name."""
+
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "User-Agent": USER_AGENT,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Origin": "https://discord.com",
+                "Referer": "https://discord.com/register",
+            }
+        )
+
+    def check(self, name: str) -> str:
+        """Return 'free', 'taken', or 'error'."""
+        for attempt in range(3):
+            try:
+                response = self.session.post(
+                    DISCORD_URL, json={"username": name}, timeout=20
+                )
+            except requests.RequestException:
+                time.sleep(1.2 + attempt)
+                continue
+
+            if response.status_code == 429:
+                wait_out(retry_after(response))
+                continue
+            if response.status_code == 400:
+                return "taken"
+            if response.status_code != 200:
+                time.sleep(1.0 + attempt)
+                continue
+            try:
+                taken = response.json().get("taken")
+            except ValueError:
+                return "error"
+            if taken is True:
+                return "taken"
+            if taken is False:
+                return "free"
+            return "error"
+        return "error"
+
+
+def retry_after(response: requests.Response) -> float:
+    try:
+        payload = response.json()
+        if "retry_after" in payload:
+            return float(payload["retry_after"])
+    except (ValueError, TypeError):
+        pass
+    header = response.headers.get("Retry-After")
+    if header:
+        try:
+            return float(header)
+        except ValueError:
+            pass
+    return 5.0
+
+
 def claim_url(name: str) -> str:
     return CLAIM_URL.format(name=name)
 
 
-def send_webhook(webhook: str, name: str) -> tuple[bool, str]:
-    payload = {
-        "username": "ISAKU",
-        "embeds": [
-            {
-                "title": "Ledigt guns.lol navn",
-                "description": f"```\n{name}\n```",
-                "url": claim_url(name),
-                "color": 0xA855F7,
-                "fields": [
-                    {"name": "Username", "value": f"`{name}`", "inline": True},
-                    {"name": "Bogstaver", "value": str(len(name)), "inline": True},
-                    {"name": "Claim", "value": claim_url(name)},
-                ],
-                "footer": {"text": "ISAKU"},
-            }
-        ],
+def send_webhook(webhook: str, platform: str, name: str) -> tuple[bool, str]:
+    place = PLACES[platform]
+    fields = [
+        {"name": "Username", "value": f"`{name}`", "inline": True},
+        {"name": "Bogstaver", "value": str(len(name)), "inline": True},
+        {"name": "Sted", "value": place, "inline": True},
+    ]
+    embed: dict[str, object] = {
+        "title": f"Ledigt {place} navn",
+        "description": f"```\n{name}\n```",
+        "color": 0xA855F7,
+        "fields": fields,
+        "footer": {"text": "ISAKU"},
     }
+    if platform == "guns":
+        embed["url"] = claim_url(name)
+        fields.append({"name": "Claim", "value": claim_url(name)})
+    payload = {"username": "ISAKU", "embeds": [embed]}
     for attempt in range(3):
         try:
             response = requests.post(webhook, json=payload, timeout=15)
@@ -344,9 +448,9 @@ def send_webhook(webhook: str, name: str) -> tuple[bool, str]:
     return False, "webhook svarede ikke"
 
 
-def status_line(current: str, checked: int, found: int, target: int) -> None:
+def status_line(platform: str, current: str, checked: int, found: int, target: int) -> None:
     line = (
-        f"  {PURPLE}tjekker{RESET} {INK}{current:<8}{RESET}"
+        f"  {PURPLE}{PLACES[platform]:<10}{RESET} {INK}{current:<8}{RESET}"
         f"  {MUTED}tjekket {checked}{RESET}"
         f"  {PURPLE_HOT}ledige {found}/{target}{RESET}"
     )
@@ -359,21 +463,27 @@ def clear_status() -> None:
     sys.stdout.flush()
 
 
-def hunt(webhook: str, target: int, length: int) -> list[str]:
-    known = load_known()
+def hunt(webhook: str, target: int, length: int, platform: str) -> list[tuple[str, str]]:
+    known = load_known(platform)
+    place = PLACES[platform]
+    delay = DISCORD_DELAY if platform == "discord" else GUNS_DELAY
     write()
-    write(f"  {MUTED}blander {26 ** length:,} navne på {length} bogstaver...{RESET}".replace(",", "."))
+    write(
+        f"  {MUTED}blander {26 ** length:,} {place}-navne på {length} bogstaver...{RESET}".replace(
+            ",", "."
+        )
+    )
     names = build_names(length, known)
-    checker = Checker()
-    found: list[str] = []
+    checker: Checker | DiscordChecker = DiscordChecker() if platform == "discord" else Checker()
+    found: list[tuple[str, str]] = []
     checked = 0
 
     write()
-    write(f"  {PURPLE_SOFT}leder efter {target} ledige navne{RESET}")
+    write(f"  {PURPLE_SOFT}leder efter {target} ledige {place}-navne{RESET}")
     write()
 
     if not names:
-        write(f"  {ROSE}Der er ikke flere nye navne tilbage i den længde.{RESET}")
+        write(f"  {ROSE}Der er ikke flere nye {place}-navne tilbage i den længde.{RESET}")
         return found
 
     try:
@@ -381,26 +491,28 @@ def hunt(webhook: str, target: int, length: int) -> list[str]:
             if len(found) >= target:
                 break
             checked += 1
-            status_line(name, checked, len(found), target)
+            status_line(platform, name, checked, len(found), target)
             result = checker.check(name)
             if result != "free":
-                time.sleep(DELAY_SECONDS)
+                time.sleep(delay)
                 continue
 
             clear_status()
-            remember(name)
-            found.append(name)
-            ok, note = send_webhook(webhook, name)
+            remember(platform, name)
+            found.append((platform, name))
+            ok, note = send_webhook(webhook, platform, name)
             color = MINT if ok else ROSE
-            write(f"  {MINT}ledig{RESET}  {BOLD}{PURPLE_HOT}{name}{RESET}")
-            write(f"         {MUTED}{claim_url(name)}{RESET}")
+            write(f"  {MINT}ledig{RESET}  {BOLD}{PURPLE_HOT}{name}{RESET}  {MUTED}{place}{RESET}")
+            if platform == "guns":
+                write(f"         {MUTED}{claim_url(name)}{RESET}")
             write(f"         {color}{note}{RESET}")
             write()
-            time.sleep(DELAY_SECONDS)
+            time.sleep(delay)
     except KeyboardInterrupt:
         clear_status()
         write()
         write(f"  {ROSE}stoppet.{RESET}")
+        raise
 
     clear_status()
     return found
@@ -410,10 +522,10 @@ def show_menu() -> None:
     clear_screen()
     paint_watermark()
     write()
-    write_centered("finder ledige navne og sender dem til din webhook", MUTED)
+    write_centered("finder ledige navne på guns.lol og discord", MUTED)
 
 
-def finish(found: list[str], target: int) -> None:
+def finish(found: list[tuple[str, str]], target: int) -> None:
     write()
     write(f"  {PURPLE}{'━' * 42}{RESET}")
     if found and len(found) >= target:
@@ -423,8 +535,8 @@ def finish(found: list[str], target: int) -> None:
         write(f"  {MUTED}de fundne navne ligger i fundet.txt{RESET}")
     else:
         write(f"  {ROSE}ingen ledige navne fundet.{RESET}")
-    for name in found:
-        write(f"    {PURPLE_HOT}{name}{RESET}")
+    for platform, name in found:
+        write(f"    {PURPLE_HOT}{name}{RESET}  {MUTED}{PLACES[platform]}{RESET}")
     write()
 
 
@@ -435,8 +547,14 @@ def main() -> None:
     webhook = prompt_webhook()
     target = prompt_count()
     length = prompt_length()
-    found = hunt(webhook, target, length)
-    finish(found, target)
+    places = prompt_places()
+    found: list[tuple[str, str]] = []
+    try:
+        for platform in places:
+            found.extend(hunt(webhook, target, length, platform))
+    except KeyboardInterrupt:
+        pass
+    finish(found, target * len(places))
 
 
 if __name__ == "__main__":
