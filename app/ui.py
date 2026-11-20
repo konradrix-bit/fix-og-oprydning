@@ -1,4 +1,4 @@
-"""Loadout-vinduet. Al logikken er den samme. Kun fladen er bygget om."""
+"""Script-menuen. Al logikken er den samme. Kun fladen er bygget om."""
 
 from __future__ import annotations
 
@@ -24,14 +24,18 @@ from app.keys import display
 from app.sequences import MODE_TITLE, describe, fast_confirm, instant_reset
 from app.system import is_admin
 from app.theme import (
+    ACCENT,
+    ACCENT_INK,
     AMBER_BG,
     BG,
     HOT,
+    HOVER,
+    HOVER_LIGHT,
     KEY,
-    LIME,
-    LIME_INK,
     LINE,
+    MARK,
     MUTED,
+    OK,
     PANEL,
     RAIL,
     STRIP,
@@ -53,10 +57,10 @@ MODE_HELP = {
 }
 SCROLL_CHOICES = (("both", "Op og ned"), ("up", "Kun op"), ("down", "Kun ned"))
 PAGES = (
-    ("Edits", "01", "Hurtige edits"),
-    ("Byg", "02", "Byg og skift"),
-    ("Ekstra", "03", "Ekstra"),
-    ("Profiler", "04", "Profiler"),
+    ("Edits", "Edits", "Hurtige edits"),
+    ("Byg", "Byg", "Byg og skift"),
+    ("Ekstra", "Ekstra", "Ekstra"),
+    ("Profiler", "Profiler", "Profiler"),
 )
 
 
@@ -65,15 +69,15 @@ class KeyButton(ctk.CTkButton):
         super().__init__(
             master,
             text=empty,
-            width=168,
-            height=34,
-            corner_radius=0,
+            width=118,
+            height=30,
+            corner_radius=4,
             border_width=1,
             border_color=LINE,
             fg_color=KEY,
-            hover_color="#283246",
+            hover_color=HOVER,
             text_color=TEXT,
-            font=app.mono_font(14, "bold"),
+            font=app.mono_font(13),
             command=self._arm,
         )
         self.app = app
@@ -94,7 +98,7 @@ class KeyButton(ctk.CTkButton):
         self.set_value(self.value)
 
     def _arm(self) -> None:
-        self.configure(text="TRYK", fg_color=LIME, text_color=LIME_INK, border_color=LIME)
+        self.configure(text="Tryk", fg_color=ACCENT, text_color=ACCENT_INK, border_color=ACCENT)
         self.app.arm_capture(self)
 
     def apply(self, name) -> None:
@@ -113,10 +117,10 @@ class ModePicker:
         for name, button in self.buttons.items():
             on = name == label
             button.configure(
-                fg_color=LIME if on else "#121722",
-                hover_color="#eaff86" if on else "#1d2636",
-                text_color=LIME_INK if on else TEXT,
-                border_color=LIME if on else LINE,
+                fg_color=ACCENT if on else PANEL,
+                hover_color=HOVER_LIGHT if on else HOVER,
+                text_color=ACCENT_INK if on else TEXT,
+                border_color=ACCENT if on else LINE,
             )
 
 
@@ -135,24 +139,27 @@ class Overlay(ctk.CTkToplevel):
             self.attributes("-toolwindow", True)
         except Exception:
             pass
-        self.configure(fg_color="#05060a")
+        self.configure(fg_color=BG)
         self.resizable(False, False)
-        shell = ctk.CTkFrame(self, fg_color="#05060a", corner_radius=0)
+        shell = ctk.CTkFrame(self, fg_color=PANEL, corner_radius=6, border_width=1, border_color=LINE)
         shell.pack(fill="both", expand=True)
-        self.stripe = ctk.CTkFrame(shell, width=5, fg_color=HOT, corner_radius=0)
-        self.stripe.pack(side="left", fill="y")
+        self.stripe = ctk.CTkFrame(shell, width=3, fg_color=HOT, corner_radius=0)
+        self.stripe.pack(side="left", fill="y", padx=(1, 0), pady=1)
+        body = ctk.CTkFrame(shell, fg_color="transparent")
+        body.pack(side="left", fill="both", expand=True, padx=(10, 12), pady=8)
+        ctk.CTkLabel(body, text="makro", anchor="w", text_color=MUTED, font=app.display_font(13)).pack(anchor="w")
         self.label = ctk.CTkLabel(
-            shell,
+            body,
             text="",
             justify="left",
             anchor="w",
             text_color=TEXT,
-            font=app.display_font(18, "bold"),
+            font=app.display_font(16, "bold"),
         )
-        self.label.pack(side="left", padx=12, pady=10, anchor="w")
+        self.label.pack(anchor="w")
         self._drag_x = 0
         self._drag_y = 0
-        for widget in (self, shell, self.label):
+        for widget in (self, shell, body, self.label):
             widget.bind("<ButtonPress-1>", self._press)
             widget.bind("<B1-Motion>", self._drag)
             widget.bind("<ButtonRelease-1>", self._release)
@@ -163,14 +170,14 @@ class Overlay(ctk.CTkToplevel):
         y = int(cfg["overlay_y"])
         if (x, y) == (28, 28):
             self.update_idletasks()
-            x = max(12, self.winfo_screenwidth() - 250)
+            x = max(12, self.winfo_screenwidth() - 240)
             y = 48
-        self.geometry(f"230x108+{x}+{y}")
+        self.geometry(f"210x86+{x}+{y}")
 
     def show_state(self, text: str) -> None:
-        on = text.startswith("TIL")
-        self.label.configure(text=text, text_color=LIME if on else TEXT)
-        self.stripe.configure(fg_color=LIME if on else HOT)
+        on = text.startswith("Slået til")
+        self.label.configure(text=text, text_color=TEXT)
+        self.stripe.configure(fg_color=OK if on else HOT)
         if self.app.cfg.get("overlay", True):
             self.deiconify()
             self.attributes("-topmost", True)
@@ -203,9 +210,9 @@ class App(ctk.CTk):
         self.binders: list[tuple[KeyButton, callable]] = []
         self.pages: dict[str, ctk.CTkScrollableFrame] = {}
         self.nav_buttons: dict[str, ctk.CTkButton] = {}
-        self.title("Fortnite Makro")
-        self.geometry("1240x860")
-        self.minsize(1080, 700)
+        self.title("Makro")
+        self.geometry("1120x780")
+        self.minsize(980, 640)
         self.configure(fg_color=BG)
         self._build()
         self.overlay = Overlay(self)
@@ -223,32 +230,42 @@ class App(ctk.CTk):
         return ctk.CTkFont(family=self.mono, size=size, weight=weight)
 
     def _build(self) -> None:
-        self.grid_columnconfigure(0, minsize=236, weight=0)
+        self.grid_columnconfigure(0, minsize=210, weight=0)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_columnconfigure(2, minsize=332, weight=0)
+        self.grid_columnconfigure(2, minsize=280, weight=0)
         self.grid_rowconfigure(1, weight=1)
-        accent = ctk.CTkFrame(self, height=4, fg_color=LIME, corner_radius=0)
+        accent = ctk.CTkFrame(self, height=2, fg_color=MARK, corner_radius=0)
         accent.grid(row=0, column=0, columnspan=3, sticky="ew")
 
         rail = ctk.CTkFrame(self, fg_color=RAIL, corner_radius=0)
         rail.grid(row=1, column=0, sticky="nsew")
-        ctk.CTkLabel(rail, text="MAKRO", anchor="w", text_color=LIME, font=self.display_font(40, "bold")).pack(fill="x", padx=20, pady=(22, 0))
-        ctk.CTkLabel(rail, text="EDIT DECK", anchor="w", text_color=MUTED, font=self.mono_font(12, "bold")).pack(fill="x", padx=22, pady=(0, 18))
-        for name, number, _title in PAGES:
+        ctk.CTkLabel(rail, text="makro", anchor="w", text_color=TEXT, font=self.display_font(26, "bold")).pack(fill="x", padx=18, pady=(18, 0))
+        ctk.CTkLabel(rail, text="Genveje", anchor="w", text_color=MUTED, font=self.display_font(14)).pack(fill="x", padx=18, pady=(0, 14))
+        self.nav_rows: dict[str, ctk.CTkFrame] = {}
+        self.nav_marks: dict[str, ctk.CTkFrame] = {}
+        for name, _label, _title in PAGES:
+            row = ctk.CTkFrame(rail, fg_color=RAIL, corner_radius=4, height=40)
+            row.pack(fill="x", padx=10, pady=2)
+            row.pack_propagate(False)
+            mark = ctk.CTkFrame(row, width=3, height=40, fg_color=RAIL, corner_radius=0)
+            mark.pack_propagate(False)
+            mark.pack(side="left", fill="y")
             button = ctk.CTkButton(
-                rail,
-                text=f"{number}    {name.upper()}",
+                row,
+                text=name,
                 anchor="w",
-                height=48,
+                height=40,
                 corner_radius=0,
                 fg_color=RAIL,
-                hover_color="#171c27",
-                text_color=TEXT,
-                font=self.display_font(22, "bold"),
+                hover_color=HOVER,
+                text_color=MUTED,
+                font=self.display_font(18),
                 command=lambda page=name: self._show(page),
             )
-            button.pack(fill="x", padx=12, pady=1)
+            button.pack(side="left", fill="both", expand=True)
             self.nav_buttons[name] = button
+            self.nav_rows[name] = row
+            self.nav_marks[name] = mark
 
         ctk.CTkLabel(
             rail,
@@ -256,33 +273,38 @@ class App(ctk.CTk):
             justify="left",
             anchor="w",
             text_color=MUTED,
-            font=self.display_font(15),
-        ).pack(side="bottom", fill="x", padx=20, pady=(0, 14))
-        self.power = ctk.CTkFrame(rail, fg_color="#16080c", corner_radius=0)
+            font=self.display_font(14),
+        ).pack(side="bottom", fill="x", padx=18, pady=(0, 14))
+        self.power = ctk.CTkFrame(rail, fg_color=STRIP, corner_radius=6)
         self.power.pack(side="bottom", fill="x", padx=12, pady=(8, 8))
-        self.state_label = ctk.CTkLabel(self.power, text="FRA", text_color=HOT, font=self.display_font(42, "bold"))
-        self.state_label.pack(anchor="w", padx=14, pady=(8, 0))
+        status = ctk.CTkFrame(self.power, fg_color="transparent")
+        status.pack(fill="x", padx=12, pady=(10, 0))
+        self.state_dot = ctk.CTkFrame(status, width=8, height=8, corner_radius=4, fg_color=HOT)
+        self.state_dot.pack_propagate(False)
+        self.state_dot.pack(side="left", padx=(0, 8), pady=6)
+        self.state_label = ctk.CTkLabel(status, text="Slået fra", text_color=TEXT, font=self.display_font(16))
+        self.state_label.pack(side="left")
         self.toggle_button = ctk.CTkButton(
             self.power,
-            text="TÆND",
-            height=34,
-            corner_radius=0,
-            fg_color=HOT,
-            hover_color="#ff6a80",
-            text_color=LIME_INK,
+            text="Tænd",
+            height=32,
+            corner_radius=4,
+            fg_color=ACCENT,
+            hover_color=HOVER_LIGHT,
+            text_color=ACCENT_INK,
             font=self.display_font(16, "bold"),
             command=self._click_toggle,
         )
-        self.toggle_button.pack(fill="x", padx=12, pady=(4, 12))
-        self.edit_readout = ctk.CTkLabel(rail, text="", justify="left", anchor="w", text_color=TEXT, font=self.display_font(16))
-        self.edit_readout.pack(side="bottom", fill="x", padx=20, pady=(0, 8))
+        self.toggle_button.pack(fill="x", padx=12, pady=(8, 12))
+        self.edit_readout = ctk.CTkLabel(rail, text="", justify="left", anchor="w", text_color=MUTED, font=self.display_font(15))
+        self.edit_readout.pack(side="bottom", fill="x", padx=18, pady=(0, 4))
 
         self.stage = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
         self.stage.grid(row=1, column=1, sticky="nsew")
         self.stage.grid_rowconfigure(0, weight=1)
         self.stage.grid_columnconfigure(0, weight=1)
         for name, _number, _title in PAGES:
-            page = ctk.CTkScrollableFrame(self.stage, fg_color=BG, scrollbar_button_color="#2a3344", scrollbar_button_hover_color=LIME)
+            page = ctk.CTkScrollableFrame(self.stage, fg_color=BG, scrollbar_button_color=LINE, scrollbar_button_hover_color=HOVER)
             page.grid(row=0, column=0, sticky="nsew")
             self.pages[name] = page
         self._build_edit_tab(self.pages["Edits"])
@@ -295,13 +317,13 @@ class App(ctk.CTk):
         hud.grid(row=1, column=2, sticky="nsew")
         hud.grid_rowconfigure(1, weight=1)
         hud.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(hud, text="SEKVENS", anchor="w", text_color=LIME, font=self.display_font(22, "bold")).grid(row=0, column=0, sticky="ew", padx=16, pady=(18, 6))
-        self.seq_box = ctk.CTkScrollableFrame(hud, fg_color=RAIL, scrollbar_button_color="#2a3344", scrollbar_button_hover_color=LIME)
+        ctk.CTkLabel(hud, text="Sekvens", anchor="w", text_color=TEXT, font=self.display_font(20, "bold")).grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 4))
+        self.seq_box = ctk.CTkScrollableFrame(hud, fg_color=RAIL, scrollbar_button_color=LINE, scrollbar_button_hover_color=HOVER)
         self.seq_box.grid(row=1, column=0, sticky="nsew", padx=8)
         self.warning = ctk.CTkLabel(hud, text="", text_color=WARN, wraplength=290, justify="left", anchor="w", font=self.display_font(15))
         self.warning.grid(row=2, column=0, sticky="ew", padx=16, pady=(6, 0))
-        ctk.CTkLabel(hud, text="LOG", anchor="w", text_color=MUTED, font=self.mono_font(11, "bold")).grid(row=3, column=0, sticky="ew", padx=16, pady=(8, 0))
-        self.log_box = ctk.CTkTextbox(hud, height=150, fg_color="#07080c", text_color="#c5d0c2", font=self.mono_font(12), corner_radius=0, border_width=1, border_color=LINE)
+        ctk.CTkLabel(hud, text="Log", anchor="w", text_color=MUTED, font=self.display_font(14)).grid(row=3, column=0, sticky="ew", padx=16, pady=(8, 0))
+        self.log_box = ctk.CTkTextbox(hud, height=132, fg_color=BG, text_color=MUTED, font=self.mono_font(12), corner_radius=4, border_width=1, border_color=LINE)
         self.log_box.grid(row=4, column=0, sticky="ew", padx=12, pady=(4, 14))
         self.log_box.configure(state="disabled")
 
@@ -313,33 +335,35 @@ class App(ctk.CTk):
                 page.grid_remove()
         for key, button in self.nav_buttons.items():
             active = key == name
+            self.nav_rows[key].configure(fg_color=STRIP if active else RAIL)
+            self.nav_marks[key].configure(fg_color=MARK if active else RAIL)
             button.configure(
-                fg_color="#1b240f" if active else RAIL,
-                hover_color="#243212" if active else "#171c27",
-                text_color=LIME if active else TEXT,
+                fg_color=STRIP if active else RAIL,
+                hover_color=HOVER,
+                text_color=TEXT if active else MUTED,
             )
 
     def _page_head(self, parent, kicker: str, title: str, body: str) -> None:
-        ctk.CTkLabel(parent, text=kicker, anchor="w", text_color=LIME, font=self.mono_font(12, "bold")).pack(fill="x", padx=22, pady=(18, 0))
-        ctk.CTkLabel(parent, text=title, anchor="w", text_color=TEXT, font=self.display_font(36, "bold")).pack(fill="x", padx=20, pady=(0, 4))
+        ctk.CTkLabel(parent, text=kicker, anchor="w", text_color=MUTED, font=self.display_font(14)).pack(fill="x", padx=22, pady=(16, 0))
+        ctk.CTkLabel(parent, text=title, anchor="w", text_color=TEXT, font=self.display_font(26, "bold")).pack(fill="x", padx=22, pady=(0, 2))
         self._hint(parent, body)
 
     def _scroller(self, parent) -> ctk.CTkScrollableFrame:
         return parent
 
     def _hint(self, parent, text: str) -> ctk.CTkLabel:
-        label = ctk.CTkLabel(parent, text=text, text_color=MUTED, wraplength=620, justify="left", anchor="w", font=self.display_font(16))
+        label = ctk.CTkLabel(parent, text=text, text_color=MUTED, wraplength=560, justify="left", anchor="w", font=self.display_font(15))
         label.pack(fill="x", padx=22, pady=(0, 12))
         return label
 
     def _section(self, parent, text: str) -> None:
-        ctk.CTkLabel(parent, text=text.upper(), anchor="w", text_color=LIME, font=self.display_font(15, "bold")).pack(fill="x", padx=22, pady=(16, 6))
+        ctk.CTkLabel(parent, text=text, anchor="w", text_color=MUTED, font=self.display_font(14)).pack(fill="x", padx=22, pady=(14, 4))
 
     def _key_row(self, parent, label: str, getter, setter, bg: str = STRIP, inset: int = 22) -> KeyButton:
-        row = ctk.CTkFrame(parent, fg_color=bg, corner_radius=0, height=50)
-        row.pack(fill="x", padx=inset, pady=1)
+        row = ctk.CTkFrame(parent, fg_color=bg, corner_radius=4, height=44)
+        row.pack(fill="x", padx=inset, pady=3)
         row.pack_propagate(False)
-        ctk.CTkLabel(row, text=label, anchor="w", text_color=TEXT, font=self.display_font(18)).pack(side="left", padx=14)
+        ctk.CTkLabel(row, text=label, anchor="w", text_color=TEXT, font=self.display_font(16)).pack(side="left", padx=12)
         button = KeyButton(row, self, setter)
         button.pack(side="right", padx=8)
         self.binders.append((button, getter))
@@ -356,10 +380,10 @@ class App(ctk.CTk):
             to=end,
             number_of_steps=steps,
             command=command,
-            progress_color=LIME,
-            button_color=LIME,
-            button_hover_color="#f3ffb0",
-            fg_color="#2a3346",
+            progress_color=MARK,
+            button_color=ACCENT,
+            button_hover_color=HOVER_LIGHT,
+            fg_color=LINE,
         )
         slider.pack(fill="x", pady=(6, 2))
         return block, label, slider
@@ -368,20 +392,20 @@ class App(ctk.CTk):
         return ctk.CTkButton(
             parent,
             text=text,
-            height=34,
-            corner_radius=0,
+            height=32,
+            corner_radius=4,
             border_width=1,
-            border_color=LIME if lime else LINE,
-            fg_color=LIME if lime else KEY,
-            hover_color="#eaff86" if lime else "#283246",
-            text_color=LIME_INK if lime else TEXT,
+            border_color=ACCENT if lime else LINE,
+            fg_color=ACCENT if lime else KEY,
+            hover_color=HOVER_LIGHT if lime else HOVER,
+            text_color=ACCENT_INK if lime else TEXT,
             font=self.display_font(15, "bold"),
             command=command,
         )
 
     def _build_edit_tab(self, parent) -> None:
         page = self._scroller(parent)
-        self._page_head(page, "01  /  EDIT", "Hurtige edits", "Sæt de samme taster i Fortnite. Makroen sender kun de tryk, du har valgt her.")
+        self._page_head(page, "Edits", "Hurtige edits", "Sæt de samme taster i Fortnite. Makroen sender kun de tryk, du har valgt her.")
         self.mode_help = self._hint(page, "")
         modes = ctk.CTkFrame(page, fg_color="transparent")
         modes.pack(fill="x", padx=22, pady=(0, 12))
@@ -389,15 +413,15 @@ class App(ctk.CTk):
         for _mode, label in MODE_CHOICES:
             button = ctk.CTkButton(
                 modes,
-                text=label.upper(),
-                height=46,
-                corner_radius=0,
+                text=label,
+                height=36,
+                corner_radius=4,
                 border_width=1,
                 border_color=LINE,
-                fg_color="#121722",
-                hover_color="#1d2636",
+                fg_color=PANEL,
+                hover_color=HOVER,
                 text_color=TEXT,
-                font=self.display_font(18, "bold"),
+                font=self.display_font(16),
                 command=lambda chosen=label: self._on_mode(chosen),
             )
             button.pack(side="left", fill="x", expand=True, padx=2)
@@ -415,7 +439,7 @@ class App(ctk.CTk):
         self._key_row(page, "Turbo-reset, hold", lambda: self.cfg["edit"]["turbo_hotkey"], lambda value: self._set_edit("turbo_hotkey", value))
         _block, self.turbo_label, self.turbo_slider = self._slider(page, self._on_turbo, 15, 150, 135)
 
-        scroll = ctk.CTkFrame(page, fg_color=STRIP, corner_radius=0, height=52)
+        scroll = ctk.CTkFrame(page, fg_color=STRIP, corner_radius=4, height=48)
         scroll.pack(fill="x", padx=22, pady=(10, 1))
         scroll.pack_propagate(False)
         self.scroll_switch = ctk.CTkSwitch(
@@ -423,10 +447,10 @@ class App(ctk.CTk):
             text="Scroll er reset",
             command=self._on_scroll_switch,
             font=self.display_font(16),
-            progress_color=LIME,
-            button_color="#f4f7fb",
-            button_hover_color=LIME,
-            fg_color="#2a3346",
+            progress_color=MARK,
+            button_color=ACCENT,
+            button_hover_color=HOVER_LIGHT,
+            fg_color=LINE,
             text_color=TEXT,
         )
         self.scroll_switch.pack(side="left", padx=14)
@@ -436,14 +460,14 @@ class App(ctk.CTk):
             command=self._on_scroll_dir,
             width=140,
             height=32,
-            corner_radius=0,
+            corner_radius=4,
             fg_color=KEY,
-            button_color="#2a3346",
-            button_hover_color=LIME,
+            button_color=LINE,
+            button_hover_color=HOVER,
             text_color=TEXT,
             dropdown_fg_color=PANEL,
             dropdown_text_color=TEXT,
-            dropdown_hover_color="#1d2636",
+            dropdown_hover_color=HOVER,
             font=self.display_font(15),
         )
         self.scroll_menu.pack(side="right", padx=8)
@@ -462,22 +486,22 @@ class App(ctk.CTk):
         self._key_row(page, "Skift edit-tast", lambda: self.cfg["edit"]["cycle_hotkey"], lambda value: self._set_edit("cycle_hotkey", value))
         self.cycle_frame = ctk.CTkFrame(page, fg_color="transparent")
         self.cycle_frame.pack(fill="x", padx=22, pady=6)
-        self.add_cycle = KeyButton(page, self, self._add_cycle_key, empty="+ TAST")
+        self.add_cycle = KeyButton(page, self, self._add_cycle_key, empty="Tilføj")
         self.add_cycle.pack(anchor="w", padx=22, pady=(0, 18))
 
     def _build_build_tab(self, parent) -> None:
         page = self._scroller(parent)
-        self._page_head(page, "02  /  BYG", "Byg og skift", "Spiltasten er den, Fortnite allerede bruger. Genvejen trykker den. Replace placerer også.")
+        self._page_head(page, "Byg", "Byg og skift", "Spiltasten er den, Fortnite allerede bruger. Genvejen trykker den. Replace placerer også.")
         self._key_row(page, "Placer", lambda: self.cfg["build"]["place_key"], lambda value: self._set_build("place_key", value))
         self.auto_place = ctk.CTkSwitch(
             page,
             text="Placer med det samme på bygge-genveje",
             command=self._on_auto_place,
             font=self.display_font(16),
-            progress_color=LIME,
-            button_color="#f4f7fb",
-            button_hover_color=LIME,
-            fg_color="#2a3346",
+            progress_color=MARK,
+            button_color=ACCENT,
+            button_hover_color=HOVER_LIGHT,
+            fg_color=LINE,
             text_color=TEXT,
         )
         self.auto_place.pack(anchor="w", padx=22, pady=10)
@@ -487,21 +511,21 @@ class App(ctk.CTk):
         self.piece_replace = {}
         self.piece_cycle = {}
         for piece_id in PIECE_ORDER:
-            card = ctk.CTkFrame(page, fg_color="#10151f", corner_radius=0, border_width=1, border_color=LINE)
-            card.pack(fill="x", padx=22, pady=(10, 0))
+            card = ctk.CTkFrame(page, fg_color=PANEL, corner_radius=6, border_width=1, border_color=LINE)
+            card.pack(fill="x", padx=22, pady=(8, 0))
             head = ctk.CTkFrame(card, fg_color="transparent")
-            head.pack(fill="x", padx=14, pady=(10, 4))
-            ctk.CTkLabel(head, text=PIECE_LABELS[piece_id].upper(), text_color=TEXT, font=self.display_font(24, "bold")).pack(side="left")
+            head.pack(fill="x", padx=12, pady=(8, 2))
+            ctk.CTkLabel(head, text=PIECE_LABELS[piece_id], text_color=TEXT, font=self.display_font(18, "bold")).pack(side="left")
             box = ctk.CTkCheckBox(
                 head,
                 text="I skift",
                 command=lambda pid=piece_id: self._on_piece_cycle(pid),
                 font=self.display_font(15),
                 text_color=TEXT,
-                fg_color=LIME,
-                hover_color=LIME,
+                fg_color=MARK,
+                hover_color=MARK,
                 border_color=LINE,
-                checkmark_color=LIME_INK,
+                checkmark_color=ACCENT_INK,
             )
             box.pack(side="right")
             self.piece_cycle[piece_id] = box
@@ -510,7 +534,7 @@ class App(ctk.CTk):
                 "I spillet",
                 lambda pid=piece_id: self.cfg["build"]["pieces"][pid]["game_key"],
                 lambda value, pid=piece_id: self._set_piece(pid, "game_key", value),
-                bg="#10151f",
+                bg=PANEL,
                 inset=12,
             )
             self.piece_hot[piece_id] = self._key_row(
@@ -518,7 +542,7 @@ class App(ctk.CTk):
                 "Genvej",
                 lambda pid=piece_id: self.cfg["build"]["pieces"][pid]["hotkey"],
                 lambda value, pid=piece_id: self._set_piece(pid, "hotkey", value),
-                bg="#10151f",
+                bg=PANEL,
                 inset=12,
             )
             self.piece_replace[piece_id] = self._key_row(
@@ -526,7 +550,7 @@ class App(ctk.CTk):
                 "Replace",
                 lambda pid=piece_id: self.cfg["build"]["pieces"][pid]["replace_hotkey"],
                 lambda value, pid=piece_id: self._set_piece(pid, "replace_hotkey", value),
-                bg="#10151f",
+                bg=PANEL,
                 inset=12,
             )
         ctk.CTkFrame(page, fg_color="transparent", height=16).pack()
@@ -537,10 +561,10 @@ class App(ctk.CTk):
             text=text,
             command=command,
             font=self.display_font(16),
-            progress_color=LIME,
-            button_color="#f4f7fb",
-            button_hover_color=LIME,
-            fg_color="#2a3346",
+            progress_color=MARK,
+            button_color=ACCENT,
+            button_hover_color=HOVER_LIGHT,
+            fg_color=LINE,
             text_color=TEXT,
         )
         switch.pack(anchor="w", padx=22, pady=5)
@@ -548,7 +572,7 @@ class App(ctk.CTk):
 
     def _build_extra_tab(self, parent) -> None:
         page = self._scroller(parent)
-        self._page_head(page, "03  /  EKSTRA", "Ekstra", "Ryd en genvej, hvis du ikke vil bruge den. Makroen gør ingenting, før du tænder den.")
+        self._page_head(page, "Ekstra", "Ekstra", "Ryd en genvej, hvis du ikke vil bruge den. Makroen gør ingenting, før du tænder den.")
         self._key_row(page, "Saml op i spillet", lambda: self.cfg["extras"]["pickup_key"], lambda value: self._set_extra("pickup_key", value))
         self._key_row(page, "Saml op, hold", lambda: self.cfg["extras"]["pickup_hotkey"], lambda value: self._set_extra("pickup_hotkey", value))
         _block, self.pickup_value, self.pickup_slider = self._slider(page, self._on_pickup, 15, 150, 135)
@@ -590,7 +614,7 @@ class App(ctk.CTk):
 
     def _build_profile_tab(self, parent) -> None:
         page = self._scroller(parent)
-        self._page_head(page, "04  /  PROFIL", "Profiler", "En profil gemmer edit-tilstand og edit-, reset- og bekræft-tast. Genvejen hopper til næste.")
+        self._page_head(page, "Profiler", "Profiler", "En profil gemmer edit-tilstand og edit-, reset- og bekræft-tast. Genvejen hopper til næste.")
         self._key_row(page, "Skift profil", lambda: self.cfg["profile_cycle_hotkey"], lambda value: self._set_root("profile_cycle_hotkey", value))
         row = ctk.CTkFrame(page, fg_color="transparent")
         row.pack(fill="x", padx=22, pady=8)
@@ -598,10 +622,10 @@ class App(ctk.CTk):
             row,
             placeholder_text="Navn på profil",
             height=36,
-            corner_radius=0,
+            corner_radius=4,
             border_width=1,
             border_color=LINE,
-            fg_color="#0c1018",
+            fg_color=BG,
             text_color=TEXT,
             placeholder_text_color=MUTED,
             font=self.display_font(16),
@@ -627,17 +651,19 @@ class App(ctk.CTk):
     def refresh_status(self) -> None:
         edit = self.cfg["edit"]
         on = self.engine.enabled if hasattr(self, "engine") else self.cfg["enabled"]
-        self.state_label.configure(text="TIL" if on else "FRA", text_color=LIME if on else HOT)
-        self.power.configure(fg_color="#14200a" if on else "#16080c")
+        self.state_label.configure(text="Slået til" if on else "Slået fra", text_color=TEXT)
+        self.state_dot.configure(fg_color=OK if on else HOT)
+        self.power.configure(fg_color=STRIP)
         self.toggle_button.configure(
-            text="SLUK" if on else "TÆND",
-            fg_color=LIME if on else HOT,
-            hover_color="#eaff86" if on else "#ff6a80",
-            text_color=LIME_INK,
+            text="Sluk" if on else "Tænd",
+            fg_color=KEY if on else ACCENT,
+            hover_color=HOVER if on else HOVER_LIGHT,
+            text_color=TEXT if on else ACCENT_INK,
+            border_color=LINE if on else ACCENT,
         )
         profile = self.cfg.get("active_profile") or "ikke gemt"
         self.edit_readout.configure(
-            text=f"EDIT  {display(edit['edit_key'])}\n{MODE_TITLE.get(edit['mode'], edit['mode'])}  ·  {profile}"
+            text=f"{display(edit['edit_key'])}  ·  {MODE_TITLE.get(edit['mode'], edit['mode'])}\n{profile}"
         )
         self._render_sequence()
         notes = []
@@ -648,8 +674,8 @@ class App(ctk.CTk):
             notes.append("Vælg en anden bekræft-tast end edit.")
         self.warning.configure(text="\n".join(notes), fg_color=AMBER_BG if notes else "transparent")
         if hasattr(self, "overlay"):
-            state = "TIL" if on else "FRA"
-            self.overlay.show_state(f"{state}\nEDIT   {display(edit['edit_key'])}\nRESET  {display(edit['reset_key'])}")
+            state = "Slået til" if on else "Slået fra"
+            self.overlay.show_state(f"{state}\n{display(edit['edit_key'])}   {display(edit['reset_key'])}")
         if hasattr(self, "admin_label"):
             if sys.platform == "win32":
                 self.admin_label.configure(
@@ -679,7 +705,7 @@ class App(ctk.CTk):
                 )
             )
         for title, lines in blocks:
-            ctk.CTkLabel(self.seq_box, text=title.upper(), anchor="w", text_color=MUTED, font=self.mono_font(11, "bold")).pack(fill="x", padx=8, pady=(10, 4))
+            ctk.CTkLabel(self.seq_box, text=title, anchor="w", text_color=MUTED, font=self.display_font(14)).pack(fill="x", padx=8, pady=(10, 2))
             if not lines:
                 ctk.CTkLabel(self.seq_box, text="Sæt en edit-tast", anchor="w", text_color=TEXT, font=self.display_font(16)).pack(fill="x", padx=8)
                 continue
@@ -688,9 +714,8 @@ class App(ctk.CTk):
                 number = line.split(".", 1)[0] if ". " in line else ""
                 row = ctk.CTkFrame(self.seq_box, fg_color="transparent")
                 row.pack(fill="x", padx=8, pady=2)
-                badge = ctk.CTkLabel(row, text=number, width=26, height=26, fg_color=LIME, text_color=LIME_INK, font=self.mono_font(12, "bold"))
-                badge.pack(side="left", padx=(0, 8))
-                ctk.CTkLabel(row, text=text, anchor="w", text_color=TEXT, font=self.display_font(16)).pack(side="left")
+                ctk.CTkLabel(row, text=number, width=16, anchor="w", text_color=MUTED, font=self.mono_font(12)).pack(side="left")
+                ctk.CTkLabel(row, text=text, anchor="w", text_color=TEXT, font=self.display_font(15)).pack(side="left", padx=(6, 0))
 
     def _load_form(self) -> None:
         self._loading = True
@@ -699,14 +724,14 @@ class App(ctk.CTk):
             for button, getter in self.binders:
                 button.set_value(getter())
             self.add_cycle.set_value("")
-            self.add_cycle.configure(text="+ TAST", text_color=LIME, border_color=LIME, fg_color="#141a0c")
+            self.add_cycle.configure(text="Tilføj", text_color=MUTED, border_color=LINE, fg_color=KEY)
             self.mode_switch.set(dict(MODE_CHOICES)[edit["mode"]])
             self.mode_help.configure(text=MODE_HELP[edit["mode"]])
             if edit["mode"] == "double":
                 self.confirm_button.configure(state="normal")
                 self.confirm_button.set_value(edit["confirm_key"])
             else:
-                self.confirm_button.configure(state="disabled", fg_color="#10141c", text_color="#667084", border_color="#242b3a")
+                self.confirm_button.configure(state="disabled", fg_color=BG, text_color=MUTED, border_color=LINE)
             self.turbo_slider.set(edit["turbo_ms"])
             self.turbo_label.configure(text=f"Turbo-interval   {edit['turbo_ms']} ms")
             self.step_slider.set(self.cfg["step_ms"])
@@ -741,7 +766,7 @@ class App(ctk.CTk):
         for child in self.cycle_frame.winfo_children():
             child.destroy()
         for key in self.cfg["edit"]["cycle_keys"]:
-            row = ctk.CTkFrame(self.cycle_frame, fg_color=STRIP, corner_radius=0, height=44)
+            row = ctk.CTkFrame(self.cycle_frame, fg_color=STRIP, corner_radius=4, height=40)
             row.pack(fill="x", pady=1)
             row.pack_propagate(False)
             ctk.CTkLabel(row, text=display(key), anchor="w", text_color=TEXT, font=self.mono_font(14, "bold")).pack(side="left", padx=12)
@@ -755,11 +780,11 @@ class App(ctk.CTk):
             return
         for profile in self.cfg["profiles"]:
             active = profile["name"] == self.cfg.get("active_profile")
-            row = ctk.CTkFrame(self.profile_list, fg_color="#1b240f" if active else STRIP, corner_radius=0, border_width=1, border_color=LIME if active else LINE)
+            row = ctk.CTkFrame(self.profile_list, fg_color=STRIP, corner_radius=6, border_width=1, border_color=MARK if active else LINE)
             row.pack(fill="x", pady=4)
             text = ctk.CTkFrame(row, fg_color="transparent")
             text.pack(side="left", padx=12, pady=8)
-            ctk.CTkLabel(text, text=profile["name"], anchor="w", text_color=LIME if active else TEXT, font=self.display_font(22, "bold")).pack(anchor="w")
+            ctk.CTkLabel(text, text=profile["name"], anchor="w", text_color=TEXT, font=self.display_font(18, "bold")).pack(anchor="w")
             ctk.CTkLabel(
                 text,
                 text=f"{display(profile['edit_key'])}   ·   {MODE_TITLE.get(profile['mode'], profile['mode'])}",
